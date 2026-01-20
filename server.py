@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tablet Display Controller Server
+Life Dashboard Server
 
 An HTTPS server with session-based authentication.
 Run with: python server.py
@@ -55,7 +55,7 @@ def generate_self_signed_cert():
         "-out", str(CERT_FILE),
         "-days", "365",
         "-nodes",
-        "-subj", "/CN=tablet-display-controller"
+        "-subj", "/CN=life-dashboard"
     ], check=True, capture_output=True)
     print(f"Certificate generated: {CERT_FILE}")
 
@@ -122,7 +122,7 @@ LOGIN_PAGE = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Tablet Display Controller</title>
+    <title>Login - Life Dashboard</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -195,7 +195,7 @@ LOGIN_PAGE = """<!DOCTYPE html>
 </head>
 <body>
     <div class="login-box">
-        <h1>Tablet Display</h1>
+        <h1>Life Dashboard</h1>
         {error}
         <form method="POST" action="/login">
             <div class="form-group">
@@ -301,7 +301,7 @@ def main():
     with socketserver.TCPServer((HOST, PORT), AuthHandler) as httpd:
         httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
 
-        print("Tablet Display Controller")
+        print("Life Dashboard")
         print(f"Server running at https://{HOST}:{PORT}")
         print(f"Access from tablet: https://<this-machine-ip>:{PORT}")
         print(f"User: {DEFAULT_USERNAME}")

@@ -1,4 +1,4 @@
-# Tablet Display Controller
+# Life Dashboard
 
 A simple web page that displays an iframe with rotation controls, fullscreen capability, and URL management. Designed for a tablet connected to a vertically-oriented monitor where native rotation isn't possible.
 
