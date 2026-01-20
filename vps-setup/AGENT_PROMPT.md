@@ -13,16 +13,16 @@ I need you to set up nginx reverse proxy on my VPS for the Life Dashboard calend
 - VPS: 72.60.218.33 (srv1065721.hstgr.cloud)
 - User: root
 - SSH Key: ~/.ssh/id_ed25519
-- Domain: calendar.prabhanshu.space
+- Domain: life.prabhanshu.space
 
 ## What to do
 
 1. **Check existing setup** - Read ~/Programs/vps_bootstrap/ to understand current deployment pattern
 
-2. **Add DNS record** for calendar.prabhanshu.space → 72.60.218.33
+2. **Add DNS record** for life.prabhanshu.space → 72.60.218.33
    - Check how DNS is managed (Cloudflare? Hostinger?)
 
-3. **Create nginx config** for calendar.prabhanshu.space
+3. **Create nginx config** for life.prabhanshu.space
    - Reverse proxy to localhost:8081 (where Pi tunnel will connect)
    - SSL via certbot
 
@@ -41,7 +41,7 @@ I need you to set up nginx reverse proxy on my VPS for the Life Dashboard calend
 ## Verification
 After deployment, run:
 ```bash
-curl -sI https://calendar.prabhanshu.space
+curl -sI https://life.prabhanshu.space
 ```
 Should return 502 (expected - Pi tunnel not connected yet).
 

@@ -137,15 +137,15 @@ I need you to set up nginx reverse proxy on my VPS for the Life Dashboard calend
 - VPS: 72.60.218.33 (srv1065721.hstgr.cloud)
 - User: root
 - SSH Key: ~/.ssh/id_ed25519
-- Domain: calendar.prabhanshu.space
+- Domain: life.prabhanshu.space
 
 ## What to do
 
 1. Check existing setup - Read ~/Programs/vps_bootstrap/ to understand current deployment pattern
 
-2. Add DNS record for calendar.prabhanshu.space → 72.60.218.33
+2. Add DNS record for life.prabhanshu.space → 72.60.218.33
 
-3. Create nginx config for calendar.prabhanshu.space
+3. Create nginx config for life.prabhanshu.space
    - Reverse proxy to localhost:8081 (where Pi tunnel will connect)
    - SSL via certbot
 
@@ -212,10 +212,10 @@ The script will:
 cat ~/Programs/life-dashboard/vps-setup/TASK.md
 
 # 2. Test the full chain
-curl https://calendar.prabhanshu.space/api/health
+curl https://life.prabhanshu.space/api/health
 
 # 3. Open dashboard in browser
-xdg-open https://calendar.prabhanshu.space
+xdg-open https://life.prabhanshu.space
 
 # 4. Test /calendar skill
 # In Claude Code: /calendar add test event tomorrow at 3pm

@@ -3,7 +3,7 @@
 # Run on VPS via GitHub Actions
 set -e
 
-DOMAIN="calendar.prabhanshu.space"
+DOMAIN="life.prabhanshu.space"
 EMAIL="mail.prabhanshu@gmail.com"
 REPO_DIR="/var/www/life-dashboard"
 NGINX_CONF="/etc/nginx/sites-available/$DOMAIN"

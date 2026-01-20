@@ -61,7 +61,7 @@ if [ "$CALENDAR_STATUS" = "active" ] && [ "$TUNNEL_STATUS" = "active" ]; then
     echo "All services running!"
     echo ""
     echo "Dashboard should be available at:"
-    echo "  https://calendar.prabhanshu.space (after VPS nginx setup)"
+    echo "  https://life.prabhanshu.space (after VPS nginx setup)"
     echo ""
     echo "Local test on Pi:"
     echo "  ssh $PI_HOST 'curl -s http://127.0.0.1:8080/api/health'"

@@ -5,14 +5,14 @@
 # Add this config to your VPS deployment repo and deploy via GitHub Actions
 #
 # The Pi establishes an SSH tunnel that forwards VPS:8081 -> Pi:8080
-# nginx then proxies calendar.prabhanshu.space -> localhost:8081
+# nginx then proxies life.prabhanshu.space -> localhost:8081
 
 cat << 'NGINX_CONFIG'
-# /etc/nginx/sites-available/calendar.prabhanshu.space
+# /etc/nginx/sites-available/life.prabhanshu.space
 
 server {
     listen 80;
-    server_name calendar.prabhanshu.space;
+    server_name life.prabhanshu.space;
 
     # Redirect HTTP to HTTPS
     return 301 https://$host$request_uri;
@@ -20,11 +20,11 @@ server {
 
 server {
     listen 443 ssl;
-    server_name calendar.prabhanshu.space;
+    server_name life.prabhanshu.space;
 
     # SSL will be configured by certbot
-    # ssl_certificate /etc/letsencrypt/live/calendar.prabhanshu.space/fullchain.pem;
-    # ssl_certificate_key /etc/letsencrypt/live/calendar.prabhanshu.space/privkey.pem;
+    # ssl_certificate /etc/letsencrypt/live/life.prabhanshu.space/fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/life.prabhanshu.space/privkey.pem;
 
     location / {
         proxy_pass http://127.0.0.1:8081;
@@ -57,14 +57,14 @@ echo ""
 echo "=== VPS Setup Instructions ==="
 echo ""
 echo "1. Add DNS record:"
-echo "   calendar.prabhanshu.space -> 72.60.218.33 (A record)"
+echo "   life.prabhanshu.space -> 72.60.218.33 (A record)"
 echo ""
 echo "2. Create nginx config (via vps_bootstrap repo deployment):"
 echo "   - Add the config above to vps_bootstrap/nginx/sites/"
 echo "   - Push to GitHub to trigger deployment"
 echo ""
 echo "3. SSL certificate:"
-echo "   certbot --nginx -d calendar.prabhanshu.space"
+echo "   certbot --nginx -d life.prabhanshu.space"
 echo ""
 echo "4. Allow Pi's SSH key in /root/.ssh/authorized_keys"
 echo "   (The Pi will try to establish a tunnel to port 8081)"

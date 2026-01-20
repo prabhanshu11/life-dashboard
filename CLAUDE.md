@@ -11,7 +11,7 @@ Pi Zero 2 W (home WiFi)
                                     │
                                     └── nginx reverse proxy
                                             │
-                                            └── calendar.prabhanshu.space
+                                            └── life.prabhanshu.space
 ```
 
 - **Pi runs**: FastAPI calendar API on localhost:8080
@@ -21,7 +21,7 @@ Pi Zero 2 W (home WiFi)
 ## Quick Reference
 
 ### URLs
-- **Production**: https://calendar.prabhanshu.space
+- **Production**: https://life.prabhanshu.space
 - **Local dev**: http://localhost:8080
 
 ### Default Calendars

@@ -10,7 +10,7 @@
 ## What Was Done
 
 ### 1. Created VPS Deployment Infrastructure
-- `deploy/nginx/calendar.prabhanshu.space.conf` - nginx reverse proxy config
+- `deploy/nginx/life.prabhanshu.space.conf` - nginx reverse proxy config
 - `deploy/vps-deploy.sh` - Deployment script (copies nginx config, runs certbot)
 - `.github/workflows/deploy-vps.yml` - GitHub Actions CI/CD workflow
 
@@ -30,7 +30,7 @@
 - VPS can now clone via HTTPS
 
 ### ⏳ Blocker 2: DNS Not Configured - PENDING USER ACTION
-- **Issue**: `calendar.prabhanshu.space` doesn't resolve
+- **Issue**: `life.prabhanshu.space` doesn't resolve
 - **Impact**: certbot can't verify domain for SSL
 - **VPS Status**: nginx config IS deployed, just no SSL yet
 - **Solution**: Add A record in Hostinger DNS dashboard
@@ -66,7 +66,7 @@ The user clarified this is part of a larger home server setup:
 ┌─────────────────────────────────────────────────────────────────┐
 │                    VPS (72.60.218.33)                           │
 │                                                                  │
-│  nginx ──► calendar.prabhanshu.space ──► Pi:8081 (tunnel)       │
+│  nginx ──► life.prabhanshu.space ──► Pi:8081 (tunnel)       │
 │                                                                  │
 │  Also hosts: prabhanshu.space, avantiterraform.com              │
 └─────────────────────────────────────────────────────────────────┘
@@ -92,7 +92,7 @@ The user clarified this is part of a larger home server setup:
 
 | File | Status | Notes |
 |------|--------|-------|
-| `deploy/nginx/calendar.prabhanshu.space.conf` | NEW | nginx config |
+| `deploy/nginx/life.prabhanshu.space.conf` | NEW | nginx config |
 | `deploy/vps-deploy.sh` | NEW | Deployment script |
 | `.github/workflows/deploy-vps.yml` | NEW | CI/CD workflow |
 | `vps-setup/TASK.md` | UPDATED | Progress tracking |
@@ -102,13 +102,13 @@ The user clarified this is part of a larger home server setup:
 ## Next Steps for Master Agent
 
 1. ✅ ~~Resolve repo visibility~~ - Made public
-2. ⏳ **Add DNS record** - Guide user to Hostinger dashboard for calendar.prabhanshu.space → 72.60.218.33
+2. ⏳ **Add DNS record** - Guide user to Hostinger dashboard for life.prabhanshu.space → 72.60.218.33
 3. ⏳ **Complete SSL** - After DNS: `gh workflow run deploy-vps.yml`
 4. ⏳ **Flash Pi SD card** - Use rpi-imager with creds from `.pi-wifi-creds`
 5. ⏳ **Boot Pi and run setup** - `scp scripts/setup-pi.sh pi@<IP>:~/` then run it
 6. ⏳ **Add Pi SSH key to VPS** - For autossh tunnel
 7. ⏳ **Deploy calendar to Pi** - `./scripts/deploy.sh pi@<IP>`
-8. ⏳ **Test end-to-end** - `curl https://calendar.prabhanshu.space/api/health`
+8. ⏳ **Test end-to-end** - `curl https://life.prabhanshu.space/api/health`
 
 ## VPS Read-Only Commands Used
 - `ls /etc/nginx/sites-enabled/`

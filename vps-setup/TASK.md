@@ -18,7 +18,7 @@ Pi Zero 2 W (home network)
     │
     └── autossh reverse tunnel ──► VPS:8081
                                       │
-                                      └── nginx ──► calendar.prabhanshu.space
+                                      └── nginx ──► life.prabhanshu.space
 ```
 
 The Pi initiates an outbound SSH tunnel to the VPS. The VPS nginx proxies HTTPS traffic to that tunnel.
@@ -26,22 +26,22 @@ The Pi initiates an outbound SSH tunnel to the VPS. The VPS nginx proxies HTTPS 
 ## Tasks
 
 ### 1. DNS Record
-- [ ] Add A record: `calendar.prabhanshu.space` → `72.60.218.33`
+- [ ] Add A record: `life.prabhanshu.space` → `72.60.218.33`
 - Provider: Check existing DNS setup for prabhanshu.space
 
 ### 2. nginx Configuration
-Create `/etc/nginx/sites-available/calendar.prabhanshu.space`:
+Create `/etc/nginx/sites-available/life.prabhanshu.space`:
 
 ```nginx
 server {
     listen 80;
-    server_name calendar.prabhanshu.space;
+    server_name life.prabhanshu.space;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl;
-    server_name calendar.prabhanshu.space;
+    server_name life.prabhanshu.space;
 
     # SSL configured by certbot
 
@@ -63,7 +63,7 @@ server {
 
 ### 3. SSL Certificate
 ```bash
-certbot --nginx -d calendar.prabhanshu.space --non-interactive --agree-tos -m mail.prabhanshu@gmail.com
+certbot --nginx -d life.prabhanshu.space --non-interactive --agree-tos -m mail.prabhanshu@gmail.com
 ```
 
 ### 4. SSH Key for Pi Tunnel
@@ -87,7 +87,7 @@ After setup, these should work:
 
 1. **DNS resolves**:
    ```bash
-   dig +short calendar.prabhanshu.space
+   dig +short life.prabhanshu.space
    # Expected: 72.60.218.33
    ```
 
@@ -98,7 +98,7 @@ After setup, these should work:
 
 3. **HTTPS works** (will show 502 until Pi tunnel is up):
    ```bash
-   curl -sI https://calendar.prabhanshu.space
+   curl -sI https://life.prabhanshu.space
    # Expected: HTTP/2 502 (tunnel not yet connected)
    ```
 
@@ -114,7 +114,7 @@ After setup, these should work:
 Update this section when done:
 
 - [ ] DNS record created (USER ACTION: Hostinger dashboard)
-- [x] nginx config created (`deploy/nginx/calendar.prabhanshu.space.conf`)
+- [x] nginx config created (`deploy/nginx/life.prabhanshu.space.conf`)
 - [x] Deploy script created (`deploy/vps-deploy.sh`)
 - [x] GitHub Actions workflow created (`.github/workflows/deploy-vps.yml`)
 - [x] GitHub secrets configured (SSH_PRIVATE_KEY, VPS_HOST, VPS_USERNAME)
@@ -127,7 +127,7 @@ Update this section when done:
 
 ```
 [2026-01-20 09:26] VPS Agent started
-[2026-01-20 09:26] Created nginx config at deploy/nginx/calendar.prabhanshu.space.conf
+[2026-01-20 09:26] Created nginx config at deploy/nginx/life.prabhanshu.space.conf
 [2026-01-20 09:26] Created deploy script at deploy/vps-deploy.sh
 [2026-01-20 09:26] Created GitHub Actions workflow at .github/workflows/deploy-vps.yml
 [2026-01-20 09:26] Set GitHub secrets: SSH_PRIVATE_KEY, VPS_HOST, VPS_USERNAME
@@ -147,7 +147,7 @@ Update this section when done:
    - **Points to**: 72.60.218.33
    - **TTL**: 3600 (or default)
 3. Wait 5-10 minutes for DNS propagation
-4. Verify: `getent hosts calendar.prabhanshu.space` should return 72.60.218.33
+4. Verify: `getent hosts life.prabhanshu.space` should return 72.60.218.33
 
 ---
 
@@ -155,7 +155,7 @@ Update this section when done:
 
 | File | Purpose |
 |------|---------|
-| `deploy/nginx/calendar.prabhanshu.space.conf` | nginx reverse proxy config |
+| `deploy/nginx/life.prabhanshu.space.conf` | nginx reverse proxy config |
 | `deploy/vps-deploy.sh` | VPS deployment script (copies config, runs certbot) |
 | `.github/workflows/deploy-vps.yml` | CI/CD pipeline for VPS deployment |
 
