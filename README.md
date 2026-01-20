@@ -5,33 +5,38 @@ A simple web page that displays an iframe with rotation controls, fullscreen cap
 ## Quick Start
 
 ```bash
-# Start the server with authentication
-python server.py
+# Edit credentials in .env
+vim .env
 
-# Open in browser
-# http://127.0.0.1:9473
-```
-
-Default credentials: `admin` / `changeme`
-
-## Custom Credentials
-
-Set environment variables before starting:
-
-```bash
-export TDC_USERNAME="myuser"
-export TDC_PASSWORD="mysecurepassword"
+# Start the server
 python server.py
 ```
+
+The server runs at **https://0.0.0.0:9473** (accessible from your network).
+
+## Configuration
+
+Edit `.env` file:
+
+```
+TDC_USERNAME=admin
+TDC_PASSWORD=your_secure_password
+```
+
+## Accessing from Tablet
+
+1. Find your machine's IP: `ip addr` or `hostname -I`
+2. On tablet, navigate to: `https://<your-ip>:9473`
+3. Accept the self-signed certificate warning
+4. Login with your credentials
 
 ## Usage
 
-1. Navigate to `http://127.0.0.1:9473`
-2. Login with your credentials
-3. Enter a URL in the input field and click **Load** (or press Enter)
-4. Use **Rotate** to cycle through 0°, 90°, 180°, 270° rotations
-5. Use **Fullscreen** to enter fullscreen mode
-6. Press browser back or ESC to exit fullscreen
+1. Login with your credentials
+2. Enter a URL in the input field and click **Load** (or press Enter)
+3. Use **Rotate** to cycle through 0°, 90°, 180°, 270° rotations
+4. Use **Fullscreen** to enter fullscreen mode
+5. Press browser back or ESC to exit fullscreen
 
 ## Keyboard Shortcuts
 
@@ -41,24 +46,25 @@ python server.py
 
 ## Features
 
+- HTTPS with auto-generated self-signed certificate
 - Session-based authentication with secure cookies
+- Credentials loaded from `.env` file (gitignored)
 - Rotation persisted in localStorage
 - URL persisted in localStorage
 - Back gesture exits fullscreen (for tablet touch interfaces)
-- Responsive sizing adjusts to container and rotation
 
 ## Security
 
+- HTTPS with TLS encryption
 - Passwords hashed with SHA-256
-- HttpOnly session cookies (not accessible via JavaScript)
-- SameSite=Strict cookies (CSRF protection)
+- HttpOnly, Secure, SameSite=Strict cookies
 - 24-hour session expiration
 - Sessions stored in memory (cleared on server restart)
+- Credentials and certificates excluded from git
 
-## Default Content
+## Files
 
-The default URL is Google Calendar in agenda mode. Note that some sites block iframe embedding (X-Frame-Options). If a site doesn't load, try a different URL or use the site's embed URL format.
-
-## Without Authentication
-
-To use without the server, open `index.html` directly in a browser.
+- `index.html` - Main app UI
+- `server.py` - HTTPS server with authentication
+- `.env` - Credentials (gitignored)
+- `cert.pem`, `key.pem` - SSL certificate (auto-generated, gitignored)

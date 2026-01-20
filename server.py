@@ -2,31 +2,68 @@
 """
 Tablet Display Controller Server
 
-A simple HTTP server with session-based authentication.
+An HTTPS server with session-based authentication.
 Run with: python server.py
 
-Default credentials (change these):
-  Username: admin
-  Password: changeme
+Credentials are loaded from .env file:
+  TDC_USERNAME=admin
+  TDC_PASSWORD=yourpassword
 """
 
 import http.server
 import socketserver
+import ssl
 import secrets
 import hashlib
 import html
 import os
-import json
+import subprocess
 from urllib.parse import parse_qs
 from http.cookies import SimpleCookie
 from datetime import datetime, timedelta
+from pathlib import Path
 
 # Configuration
 PORT = 9473
-HOST = "127.0.0.1"
+HOST = "0.0.0.0"  # Bind to all interfaces for network access
+SCRIPT_DIR = Path(__file__).parent.absolute()
+CERT_FILE = SCRIPT_DIR / "cert.pem"
+KEY_FILE = SCRIPT_DIR / "key.pem"
+ENV_FILE = SCRIPT_DIR / ".env"
 
-# Default credentials - CHANGE THESE or set environment variables
-# Password is stored as SHA-256 hash
+
+def load_env():
+    """Load environment variables from .env file."""
+    if ENV_FILE.exists():
+        with open(ENV_FILE) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
+                    os.environ.setdefault(key.strip(), value.strip())
+
+
+def generate_self_signed_cert():
+    """Generate a self-signed certificate if it doesn't exist."""
+    if CERT_FILE.exists() and KEY_FILE.exists():
+        return
+
+    print("Generating self-signed SSL certificate...")
+    subprocess.run([
+        "openssl", "req", "-x509", "-newkey", "rsa:4096",
+        "-keyout", str(KEY_FILE),
+        "-out", str(CERT_FILE),
+        "-days", "365",
+        "-nodes",
+        "-subj", "/CN=tablet-display-controller"
+    ], check=True, capture_output=True)
+    print(f"Certificate generated: {CERT_FILE}")
+
+
+# Load .env before reading credentials
+load_env()
+
+# Credentials from environment
 DEFAULT_USERNAME = os.environ.get("TDC_USERNAME", "admin")
 DEFAULT_PASSWORD_HASH = hashlib.sha256(
     os.environ.get("TDC_PASSWORD", "changeme").encode()
@@ -180,9 +217,7 @@ class AuthHandler(http.server.SimpleHTTPRequestHandler):
     """HTTP handler with session-based authentication."""
 
     def __init__(self, *args, **kwargs):
-        # Serve files from the script's directory
-        directory = os.path.dirname(os.path.abspath(__file__))
-        super().__init__(*args, directory=directory, **kwargs)
+        super().__init__(*args, directory=str(SCRIPT_DIR), **kwargs)
 
     def do_GET(self):
         """Handle GET requests."""
@@ -225,12 +260,12 @@ class AuthHandler(http.server.SimpleHTTPRequestHandler):
             # Create session
             token = create_session()
 
-            # Redirect to app with session cookie
+            # Redirect to app with session cookie (Secure flag for HTTPS)
             self.send_response(302)
             self.send_header("Location", "/")
             self.send_header(
                 "Set-Cookie",
-                f"session={token}; HttpOnly; SameSite=Strict; Path=/; Max-Age={int(SESSION_DURATION.total_seconds())}"
+                f"session={token}; HttpOnly; SameSite=Strict; Secure; Path=/; Max-Age={int(SESSION_DURATION.total_seconds())}"
             )
             self.end_headers()
         else:
@@ -254,12 +289,25 @@ class AuthHandler(http.server.SimpleHTTPRequestHandler):
 
 
 def main():
-    """Start the server."""
+    """Start the HTTPS server."""
+    # Generate certificate if needed
+    generate_self_signed_cert()
+
+    # Create SSL context
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(str(CERT_FILE), str(KEY_FILE))
+
+    # Create server with SSL
     with socketserver.TCPServer((HOST, PORT), AuthHandler) as httpd:
-        print(f"Tablet Display Controller")
-        print(f"Server running at http://{HOST}:{PORT}")
-        print(f"Default credentials: {DEFAULT_USERNAME} / changeme")
-        print(f"Set TDC_USERNAME and TDC_PASSWORD env vars to customize")
+        httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
+
+        print("Tablet Display Controller")
+        print(f"Server running at https://{HOST}:{PORT}")
+        print(f"Access from tablet: https://<this-machine-ip>:{PORT}")
+        print(f"User: {DEFAULT_USERNAME}")
+        print()
+        print("Note: Browser will warn about self-signed certificate.")
+        print("      Accept the warning to proceed.")
         print()
         try:
             httpd.serve_forever()
