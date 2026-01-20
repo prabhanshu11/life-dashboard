@@ -1,0 +1,46 @@
+name: Deploy VPS nginx (Calendar)
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'deploy/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add VPS to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy via SSH
+        run: |
+          ssh ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
+            set -e
+            REPO_DIR="/var/www/life-dashboard"
+
+            # Clone if not exists, otherwise fetch and reset
+            if [ ! -d "$REPO_DIR" ]; then
+              echo "[INFO] Cloning repository..."
+              git clone https://github.com/prabhanshu11/life-dashboard.git "$REPO_DIR"
+            else
+              echo "[INFO] Updating repository..."
+              cd "$REPO_DIR"
+              git fetch origin master
+              git reset --hard origin/master
+            fi
+
+            # Run deployment script
+            cd "$REPO_DIR"
+            chmod +x deploy/vps-deploy.sh
+            ./deploy/vps-deploy.sh
+          EOF

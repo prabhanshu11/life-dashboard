@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Life Dashboard</title>
+    <style>
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-grid: #0f0f23;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --border-color: #2a2a4e;
+            --time-line: #ff4757;
+            --hour-height: calc((100vh - 80px) / 20); /* 04:30-24:00 = ~20 hours */
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 24px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            height: 60px;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .header-date {
+            font-size: 24px;
+            color: var(--text-secondary);
+        }
+
+        .controls {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .day-selector {
+            display: flex;
+            gap: 8px;
+        }
+
+        .day-btn {
+            width: 48px;
+            height: 48px;
+            border: 2px solid var(--border-color);
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 20px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .day-btn:hover {
+            border-color: var(--time-line);
+        }
+
+        .day-btn.active {
+            background: var(--time-line);
+            border-color: var(--time-line);
+        }
+
+        .refresh-btn {
+            padding: 12px 24px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            color: var(--text-primary);
+            font-size: 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .refresh-btn:hover {
+            border-color: var(--time-line);
+        }
+
+        /* Calendar grid */
+        .calendar-container {
+            display: flex;
+            height: calc(100vh - 60px);
+        }
+
+        .time-column {
+            width: 80px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            padding-top: 20px;
+        }
+
+        .time-label {
+            height: var(--hour-height);
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            font-size: 18px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .days-container {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .day-column {
+            flex: 1;
+            border-right: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .day-column:last-child {
+            border-right: none;
+        }
+
+        .day-header {
+            height: 20px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .day-header.today {
+            background: var(--time-line);
+        }
+
+        .day-grid {
+            position: relative;
+            height: calc(100% - 20px);
+        }
+
+        .hour-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .half-hour-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            border-top: 1px dashed var(--border-color);
+            opacity: 0.5;
+        }
+
+        /* Current time indicator */
+        .current-time-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--time-line);
+            z-index: 100;
+            box-shadow: 0 0 8px var(--time-line);
+        }
+
+        .current-time-dot {
+            position: absolute;
+            left: -6px;
+            top: -5px;
+            width: 12px;
+            height: 12px;
+            background: var(--time-line);
+            border-radius: 50%;
+        }
+
+        /* Events */
+        .event {
+            position: absolute;
+            left: 4px;
+            right: 4px;
+            border-radius: 6px;
+            padding: 6px 10px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            z-index: 10;
+        }
+
+        .event:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            z-index: 20;
+        }
+
+        .event-title {
+            font-size: 20px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .event-time {
+            font-size: 16px;
+            opacity: 0.9;
+            margin-top: 2px;
+        }
+
+        .event-description {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-top: 4px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* Loading state */
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: var(--text-secondary);
+        }
+
+        /* Responsive for smaller screens */
+        @media (max-height: 1600px) {
+            .time-label {
+                font-size: 14px;
+            }
+            .event-title {
+                font-size: 16px;
+            }
+            .event-time {
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>Life Dashboard</h1>
+        <span class="header-date" id="currentDate"></span>
+        <div class="controls">
+            <div class="day-selector">
+                <button class="day-btn" data-days="1">1</button>
+                <button class="day-btn" data-days="2">2</button>
+                <button class="day-btn active" data-days="3">3</button>
+                <button class="day-btn" data-days="4">4</button>
+                <button class="day-btn" data-days="5">5</button>
+            </div>
+            <button class="refresh-btn" onclick="loadEvents()">Refresh</button>
+        </div>
+    </header>
+
+    <div class="calendar-container">
+        <div class="time-column" id="timeColumn"></div>
+        <div class="days-container" id="daysContainer"></div>
+    </div>
+
+    <script>
+        // Configuration
+        const START_HOUR = 4.5;  // 04:30
+        const END_HOUR = 24;     // 24:00
+        const TOTAL_HOURS = END_HOUR - START_HOUR;
+
+        let displayDays = 3;
+        let events = [];
+        let calendars = {};
+
+        // Get days from URL param
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('days')) {
+            displayDays = Math.min(5, Math.max(1, parseInt(urlParams.get('days'))));
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            updateDateDisplay();
+            renderTimeColumn();
+            setupDayButtons();
+            loadCalendars().then(() => loadEvents());
+
+            // Update time indicator every minute
+            setInterval(updateCurrentTimeLine, 60000);
+
+            // Auto-refresh every 60 seconds
+            setInterval(loadEvents, 60000);
+        });
+
+        function updateDateDisplay() {
+            const now = new Date();
+            const options = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' };
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', options);
+        }
+
+        function renderTimeColumn() {
+            const timeColumn = document.getElementById('timeColumn');
+            timeColumn.innerHTML = '';
+
+            for (let hour = Math.ceil(START_HOUR); hour <= END_HOUR; hour++) {
+                const label = document.createElement('div');
+                label.className = 'time-label';
+                label.textContent = hour === 24 ? '00:00' : `${hour.toString().padStart(2, '0')}:00`;
+                timeColumn.appendChild(label);
+            }
+        }
+
+        function setupDayButtons() {
+            const buttons = document.querySelectorAll('.day-btn');
+            buttons.forEach(btn => {
+                const days = parseInt(btn.dataset.days);
+                if (days === displayDays) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+
+                btn.addEventListener('click', () => {
+                    displayDays = days;
+                    buttons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    renderDays();
+
+                    // Update URL
+                    const url = new URL(window.location);
+                    url.searchParams.set('days', days);
+                    window.history.replaceState({}, '', url);
+                });
+            });
+        }
+
+        async function loadCalendars() {
+            try {
+                const response = await fetch('/api/calendars');
+                const data = await response.json();
+                data.forEach(cal => {
+                    calendars[cal.id] = cal;
+                });
+            } catch (error) {
+                console.error('Failed to load calendars:', error);
+            }
+        }
+
+        async function loadEvents() {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const endDate = new Date(today);
+            endDate.setDate(endDate.getDate() + displayDays);
+
+            const start = today.toISOString();
+            const end = endDate.toISOString();
+
+            try {
+                const response = await fetch(`/api/events?start=${start}&end=${end}`);
+                events = await response.json();
+                renderDays();
+            } catch (error) {
+                console.error('Failed to load events:', error);
+            }
+        }
+
+        function renderDays() {
+            const container = document.getElementById('daysContainer');
+            container.innerHTML = '';
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            for (let i = 0; i < displayDays; i++) {
+                const date = new Date(today);
+                date.setDate(date.getDate() + i);
+
+                const dayColumn = document.createElement('div');
+                dayColumn.className = 'day-column';
+                dayColumn.innerHTML = `
+                    <div class="day-header ${i === 0 ? 'today' : ''}">${formatDayHeader(date)}</div>
+                    <div class="day-grid" data-date="${date.toISOString().split('T')[0]}"></div>
+                `;
+                container.appendChild(dayColumn);
+            }
+
+            // Render hour lines
+            document.querySelectorAll('.day-grid').forEach(grid => {
+                for (let hour = Math.ceil(START_HOUR); hour <= END_HOUR; hour++) {
+                    const line = document.createElement('div');
+                    line.className = 'hour-line';
+                    line.style.top = `${((hour - START_HOUR) / TOTAL_HOURS) * 100}%`;
+                    grid.appendChild(line);
+
+                    // Half hour line
+                    if (hour < END_HOUR) {
+                        const halfLine = document.createElement('div');
+                        halfLine.className = 'half-hour-line';
+                        halfLine.style.top = `${((hour - START_HOUR + 0.5) / TOTAL_HOURS) * 100}%`;
+                        grid.appendChild(halfLine);
+                    }
+                }
+            });
+
+            renderEvents();
+            updateCurrentTimeLine();
+        }
+
+        function formatDayHeader(date) {
+            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            return `${days[date.getDay()]} ${date.getDate()}`;
+        }
+
+        function renderEvents() {
+            events.forEach(event => {
+                const startDate = new Date(event.start_time);
+                const endDate = new Date(event.end_time);
+                const dateStr = startDate.toISOString().split('T')[0];
+
+                const grid = document.querySelector(`.day-grid[data-date="${dateStr}"]`);
+                if (!grid) return;
+
+                const startHour = startDate.getHours() + startDate.getMinutes() / 60;
+                const endHour = endDate.getHours() + endDate.getMinutes() / 60;
+
+                // Skip events outside our time range
+                if (endHour < START_HOUR || startHour > END_HOUR) return;
+
+                const top = Math.max(0, ((startHour - START_HOUR) / TOTAL_HOURS) * 100);
+                const bottom = Math.min(100, ((endHour - START_HOUR) / TOTAL_HOURS) * 100);
+                const height = bottom - top;
+
+                const eventEl = document.createElement('div');
+                eventEl.className = 'event';
+                eventEl.style.top = `${top}%`;
+                eventEl.style.height = `${height}%`;
+                eventEl.style.backgroundColor = event.calendar_color || '#4285f4';
+
+                // Text color based on background brightness
+                const rgb = hexToRgb(event.calendar_color || '#4285f4');
+                const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+                eventEl.style.color = brightness > 128 ? '#000' : '#fff';
+
+                const timeStr = `${formatTime(startDate)} - ${formatTime(endDate)}`;
+                eventEl.innerHTML = `
+                    <div class="event-title">${escapeHtml(event.title)}</div>
+                    <div class="event-time">${timeStr}</div>
+                    ${event.description ? `<div class="event-description">${escapeHtml(event.description)}</div>` : ''}
+                `;
+
+                grid.appendChild(eventEl);
+            });
+        }
+
+        function updateCurrentTimeLine() {
+            // Remove existing time lines
+            document.querySelectorAll('.current-time-line').forEach(el => el.remove());
+
+            const now = new Date();
+            const currentHour = now.getHours() + now.getMinutes() / 60;
+
+            // Only show if within our time range
+            if (currentHour < START_HOUR || currentHour > END_HOUR) return;
+
+            const todayStr = now.toISOString().split('T')[0];
+            const grid = document.querySelector(`.day-grid[data-date="${todayStr}"]`);
+            if (!grid) return;
+
+            const top = ((currentHour - START_HOUR) / TOTAL_HOURS) * 100;
+
+            const timeLine = document.createElement('div');
+            timeLine.className = 'current-time-line';
+            timeLine.style.top = `${top}%`;
+            timeLine.innerHTML = '<div class="current-time-dot"></div>';
+            grid.appendChild(timeLine);
+        }
+
+        function formatTime(date) {
+            return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : { r: 66, g: 133, b: 244 };
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
