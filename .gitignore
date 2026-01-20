@@ -3,3 +3,4 @@
 *.key
 *.crt
 __pycache__/
+.pi-wifi-creds
