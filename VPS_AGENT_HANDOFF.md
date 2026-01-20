@@ -37,7 +37,7 @@
 - SSL certificate obtained via certbot (valid until 2026-04-20)
 
 ### ✅ Blocker 3: Port Conflict - RESOLVED
-- Port 8081 was in use by habit-tracker backend
+- Port 8082 was in use by habit-tracker backend
 - Changed to port 8082 for life-dashboard Pi tunnel
 
 ## User's Broader Vision (from conversation)

@@ -13,7 +13,8 @@
             --text-secondary: #a0a0a0;
             --border-color: #2a2a4e;
             --time-line: #ff4757;
-            --hour-height: calc((100vh - 80px) / 20); /* 04:30-24:00 = ~20 hours */
+            --total-hours: 19.5; /* 04:30-24:00 */
+            --hour-height: calc((100vh - 80px) / var(--total-hours));
         }
 
         * {
@@ -84,7 +85,7 @@
             border-color: var(--time-line);
         }
 
-        .refresh-btn {
+        .refresh-btn, .control-btn {
             padding: 12px 24px;
             background: var(--bg-secondary);
             border: 2px solid var(--border-color);
@@ -95,8 +96,110 @@
             transition: all 0.2s;
         }
 
-        .refresh-btn:hover {
+        .refresh-btn:hover, .control-btn:hover {
             border-color: var(--time-line);
+        }
+
+        .control-btn.active {
+            background: var(--time-line);
+            border-color: var(--time-line);
+        }
+
+        .last-updated {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-right: 16px;
+        }
+
+        /* Rotated state - 90 degrees clockwise */
+        /* After rotation: visual width = original height, visual height = original width */
+        body.rotated {
+            width: 100vh;
+            height: 100vw;
+            transform: rotate(90deg);
+            transform-origin: top left;
+            position: absolute;
+            top: 0;
+            left: 100%;
+            overflow: hidden;
+        }
+
+        body.rotated .header {
+            height: 50px;
+            padding: 6px 12px;
+            flex-wrap: nowrap;
+        }
+
+        body.rotated .header h1 {
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        body.rotated .header-date {
+            font-size: 14px;
+            flex-shrink: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        body.rotated .controls {
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        body.rotated .last-updated {
+            display: none; /* Hide to save space when rotated */
+        }
+
+        body.rotated .day-btn {
+            width: 32px;
+            height: 32px;
+            font-size: 14px;
+        }
+
+        body.rotated .control-btn, body.rotated .refresh-btn {
+            padding: 6px 10px;
+            font-size: 14px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        body.rotated .calendar-container {
+            height: calc(100vw - 50px);
+        }
+
+        body.rotated .time-column {
+            width: 50px;
+        }
+
+        body.rotated .time-header-spacer {
+            height: 15px; /* Match day-header height in rotated mode */
+        }
+
+        body.rotated .time-label {
+            font-size: 12px;
+        }
+
+        body.rotated .day-header {
+            height: 15px;
+            font-size: 14px;
+        }
+
+        body.rotated .day-grid {
+            height: calc(100% - 15px);
+        }
+
+        body.rotated .event-title {
+            font-size: 14px;
+        }
+
+        body.rotated .event-time {
+            font-size: 11px;
         }
 
         /* Calendar grid */
@@ -109,17 +212,31 @@
             width: 80px;
             background: var(--bg-secondary);
             border-right: 1px solid var(--border-color);
-            padding-top: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .time-header-spacer {
+            height: 20px; /* Match day-header height */
+            flex-shrink: 0;
+        }
+
+        .time-labels {
+            position: relative;
+            flex: 1;
         }
 
         .time-label {
-            height: var(--hour-height);
+            position: absolute;
+            left: 0;
+            right: 0;
             display: flex;
             align-items: flex-start;
             justify-content: center;
             font-size: 18px;
             color: var(--text-secondary);
             font-weight: 500;
+            transform: translateY(-0.5em); /* Center label on the line */
         }
 
         .days-container {
@@ -266,6 +383,7 @@
         <h1>Life Dashboard</h1>
         <span class="header-date" id="currentDate"></span>
         <div class="controls">
+            <span class="last-updated" id="lastUpdated"></span>
             <div class="day-selector">
                 <button class="day-btn" data-days="1">1</button>
                 <button class="day-btn" data-days="2">2</button>
@@ -273,12 +391,17 @@
                 <button class="day-btn" data-days="4">4</button>
                 <button class="day-btn" data-days="5">5</button>
             </div>
-            <button class="refresh-btn" onclick="loadEvents()">Refresh</button>
+            <button class="control-btn" onclick="toggleRotate()" title="Rotate 90°">⟳</button>
+            <button class="control-btn" onclick="toggleFullscreen()" title="Fullscreen">⛶</button>
+            <button class="refresh-btn" onclick="loadEvents()">↻</button>
         </div>
     </header>
 
     <div class="calendar-container">
-        <div class="time-column" id="timeColumn"></div>
+        <div class="time-column">
+            <div class="time-header-spacer"></div>
+            <div class="time-labels" id="timeLabels"></div>
+        </div>
         <div class="days-container" id="daysContainer"></div>
     </div>
 
@@ -308,9 +431,54 @@
             // Update time indicator every minute
             setInterval(updateCurrentTimeLine, 60000);
 
-            // Auto-refresh every 60 seconds
-            setInterval(loadEvents, 60000);
+            // Auto-refresh every 15 seconds
+            setInterval(loadEvents, 15000);
+
+            // Restore rotation state and set correct hour height
+            if (localStorage.getItem('rotated') === 'true') {
+                document.body.classList.add('rotated');
+                document.documentElement.style.setProperty('--hour-height', 'calc((100vw - 50px - 15px) / 19.5)');
+            }
         });
+
+        // Toggle rotation (90 degrees)
+        function toggleRotate() {
+            document.body.classList.toggle('rotated');
+            const isRotated = document.body.classList.contains('rotated');
+            localStorage.setItem('rotated', isRotated);
+
+            // Update CSS variable for hour height based on rotation
+            // When rotated: visual height = original width (100vw), header=50px, day-header=15px
+            // Normal: visual height = original height (100vh), header=60px, day-header=20px
+            // Total hours: 19.5 (04:30 to 24:00)
+            const root = document.documentElement;
+            if (isRotated) {
+                root.style.setProperty('--hour-height', 'calc((100vw - 50px - 15px) / 19.5)');
+            } else {
+                root.style.setProperty('--hour-height', 'calc((100vh - 60px - 20px) / 19.5)');
+            }
+
+            // Re-render to apply new dimensions
+            renderDays();
+        }
+
+        // Toggle fullscreen mode
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log('Fullscreen error:', err);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // Update last updated timestamp
+        function updateLastUpdated() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+            document.getElementById('lastUpdated').textContent = `Updated: ${timeStr}`;
+        }
 
         function updateDateDisplay() {
             const now = new Date();
@@ -319,14 +487,18 @@
         }
 
         function renderTimeColumn() {
-            const timeColumn = document.getElementById('timeColumn');
-            timeColumn.innerHTML = '';
+            const timeLabels = document.getElementById('timeLabels');
+            timeLabels.innerHTML = '';
 
+            // Position time labels to align with hour grid lines
             for (let hour = Math.ceil(START_HOUR); hour <= END_HOUR; hour++) {
                 const label = document.createElement('div');
                 label.className = 'time-label';
                 label.textContent = hour === 24 ? '00:00' : `${hour.toString().padStart(2, '0')}:00`;
-                timeColumn.appendChild(label);
+                // Position at same percentage as grid lines (relative to time-labels container)
+                const topPercent = ((hour - START_HOUR) / TOTAL_HOURS) * 100;
+                label.style.top = `${topPercent}%`;
+                timeLabels.appendChild(label);
             }
         }
 
@@ -380,6 +552,7 @@
                 const response = await fetch(`/api/events?start=${start}&end=${end}`);
                 events = await response.json();
                 renderDays();
+                updateLastUpdated();
             } catch (error) {
                 console.error('Failed to load events:', error);
             }

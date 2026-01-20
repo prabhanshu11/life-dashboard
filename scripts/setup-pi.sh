@@ -18,7 +18,7 @@ set -e
 
 VPS_HOST="72.60.218.33"
 VPS_USER="root"
-REMOTE_PORT="8082"  # Port on VPS that forwards to Pi's 8080 (8081 used by habit-tracker)
+REMOTE_PORT="8082"  # Port on VPS that forwards to Pi's 8080 (8082 used by habit-tracker)
 LOCAL_PORT="8080"   # Calendar API runs on this port
 
 echo "=== Life Dashboard Pi Zero 2 W Setup ==="
