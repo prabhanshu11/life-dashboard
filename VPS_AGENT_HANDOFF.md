@@ -1,11 +1,13 @@
 # VPS Agent Handoff - 2026-01-20
 
-## Current Status: PARTIAL SUCCESS
+## Current Status: ✅ VPS COMPLETE - Ready for Pi
 
 - Repo made PUBLIC
-- nginx config DEPLOYED to VPS
-- SSL PENDING (needs DNS A record)
+- nginx config DEPLOYED to VPS (port 8082)
+- SSL CERTIFICATE obtained and active
+- DNS configured: life.prabhanshu.space → 72.60.218.33
 - WiFi creds stored locally in `.pi-wifi-creds` (gitignored)
+- HTTPS working: returns 502 (expected - Pi not connected yet)
 
 ## What Was Done
 
@@ -29,15 +31,14 @@
 - Made repo PUBLIC via `gh repo edit --visibility public`
 - VPS can now clone via HTTPS
 
-### ⏳ Blocker 2: DNS Not Configured - PENDING USER ACTION
-- **Issue**: `life.prabhanshu.space` doesn't resolve
-- **Impact**: certbot can't verify domain for SSL
-- **VPS Status**: nginx config IS deployed, just no SSL yet
-- **Solution**: Add A record in Hostinger DNS dashboard
-  - Type: A
-  - Name: calendar
-  - Points to: 72.60.218.33
-- **After DNS**: Run `gh workflow run deploy-vps.yml` to complete SSL setup
+### ✅ Blocker 2: DNS Not Configured - RESOLVED
+- User added A record in Namecheap (domain registrar)
+- DNS propagated: life.prabhanshu.space → 72.60.218.33
+- SSL certificate obtained via certbot (valid until 2026-04-20)
+
+### ✅ Blocker 3: Port Conflict - RESOLVED
+- Port 8081 was in use by habit-tracker backend
+- Changed to port 8082 for life-dashboard Pi tunnel
 
 ## User's Broader Vision (from conversation)
 
