@@ -66,7 +66,7 @@ The user clarified this is part of a larger home server setup:
 ┌─────────────────────────────────────────────────────────────────┐
 │                    VPS (72.60.218.33)                           │
 │                                                                  │
-│  nginx ──► life.prabhanshu.space ──► Pi:8081 (tunnel)       │
+│  nginx ──► life.prabhanshu.space ──► Pi:8082 (tunnel)       │
 │                                                                  │
 │  Also hosts: prabhanshu.space, avantiterraform.com              │
 └─────────────────────────────────────────────────────────────────┘

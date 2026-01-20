@@ -146,7 +146,7 @@ I need you to set up nginx reverse proxy on my VPS for the Life Dashboard calend
 2. Add DNS record for life.prabhanshu.space → 72.60.218.33
 
 3. Create nginx config for life.prabhanshu.space
-   - Reverse proxy to localhost:8081 (where Pi tunnel will connect)
+   - Reverse proxy to localhost:8082 (where Pi tunnel will connect)
    - SSL via certbot
 
 4. Deploy via the existing CI/CD pattern (don't manually change VPS)

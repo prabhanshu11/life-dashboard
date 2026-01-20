@@ -7,7 +7,7 @@ Self-hosted calendar system on Raspberry Pi Zero 2 W with VPS reverse proxy and 
 ```
 Pi Zero 2 W (home WiFi)
     │
-    └── SSH tunnel (autossh) ──► VPS (72.60.218.33:8081)
+    └── SSH tunnel (autossh) ──► VPS (72.60.218.33:8082)
                                     │
                                     └── nginx reverse proxy
                                             │
@@ -15,7 +15,7 @@ Pi Zero 2 W (home WiFi)
 ```
 
 - **Pi runs**: FastAPI calendar API on localhost:8080
-- **autossh**: Maintains persistent SSH tunnel, VPS:8081 -> Pi:8080
+- **autossh**: Maintains persistent SSH tunnel, VPS:8082 -> Pi:8080
 - **VPS nginx**: Reverse proxy with SSL termination
 
 ## Quick Reference
@@ -122,7 +122,7 @@ sudo systemctl status calendar-tunnel
 sudo journalctl -u calendar-tunnel -f
 
 # On VPS
-ss -tlnp | grep 8081
+ss -tlnp | grep 8082
 ```
 
 ### API not responding

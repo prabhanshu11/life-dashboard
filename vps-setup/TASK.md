@@ -16,7 +16,7 @@ Configure VPS (72.60.218.33) to act as a reverse proxy for the Life Dashboard ca
 ```
 Pi Zero 2 W (home network)
     │
-    └── autossh reverse tunnel ──► VPS:8081
+    └── autossh reverse tunnel ──► VPS:8082
                                       │
                                       └── nginx ──► life.prabhanshu.space
 ```
@@ -46,7 +46,7 @@ server {
     # SSL configured by certbot
 
     location / {
-        proxy_pass http://127.0.0.1:8081;
+        proxy_pass http://127.0.0.1:8082;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -75,7 +75,7 @@ The Pi will connect to VPS using a dedicated SSH key. Add this to `/root/.ssh/au
 
 ### 5. Firewall (if UFW enabled)
 ```bash
-# Port 8081 only needs localhost access (nginx -> tunnel)
+# Port 8082 only needs localhost access (nginx -> tunnel)
 # No external firewall rule needed
 ```
 
@@ -102,9 +102,9 @@ After setup, these should work:
    # Expected: HTTP/2 502 (tunnel not yet connected)
    ```
 
-4. **Port 8081 listening** (after Pi connects):
+4. **Port 8082 listening** (after Pi connects):
    ```bash
-   ss -tlnp | grep 8081
+   ss -tlnp | grep 8082
    ```
 
 ---
