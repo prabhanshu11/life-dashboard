@@ -1,5 +1,11 @@
 # Life Dashboard
 
+## Agent Instructions — Read First
+
+**Before proposing or implementing any changes, read `IDEAS.md` in this directory.**
+It contains all planned modules, feature ideas, and architectural decisions discussed over the
+past 6+ months. Use it to understand full scope and avoid reinventing discussed ideas.
+
 Self-hosted calendar system on Raspberry Pi Zero 2 W with VPS reverse proxy and Claude Code integration.
 
 ## Architecture

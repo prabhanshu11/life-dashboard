@@ -72,6 +72,28 @@ def init_db():
             )
         """)
 
+        # Habits table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS habits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                emoji TEXT DEFAULT '✓',
+                color TEXT DEFAULT '#4285f4',
+                display_order INTEGER DEFAULT 99,
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+
+        # Habit logs table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS habit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                habit_id INTEGER REFERENCES habits(id),
+                logged_at TEXT DEFAULT (datetime('now')),
+                note TEXT
+            )
+        """)
+
         # Create skill_learnings table for self-improving skill
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS skill_learnings (
@@ -86,6 +108,20 @@ def init_db():
         # Create indexes for common queries
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_start ON events(start_time)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_events_calendar ON events(calendar_id)")
+
+        # Insert default habits if they don't exist
+        default_habits = [
+            (1, "Exercise",   "🏃", "#ff4757"),
+            (2, "Meditate",   "🧘", "#9c27b0"),
+            (3, "Cook",       "🍳", "#ff9800"),
+            (4, "Laundry",    "👕", "#4caf50"),
+            (5, "Wake alarm", "⏰", "#4285f4"),
+        ]
+        for order, name, emoji, color in default_habits:
+            cursor.execute(
+                "INSERT OR IGNORE INTO habits (name, emoji, color, display_order) VALUES (?, ?, ?, ?)",
+                (name, emoji, color, order)
+            )
 
         # Insert default calendars if they don't exist
         for cal in DEFAULT_CALENDARS:
@@ -326,6 +362,68 @@ def get_learned_patterns() -> list[dict]:
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM skill_learnings ORDER BY created_at DESC LIMIT 100")
         return [dict(row) for row in cursor.fetchall()]
+
+
+# Habits operations
+def get_habits() -> list[dict]:
+    """Get all habits with last-log info and today/streak status."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT h.*,
+                MAX(hl.logged_at) as last_logged,
+                COUNT(CASE WHEN date(hl.logged_at) = date('now') THEN 1 END) as done_today
+            FROM habits h
+            LEFT JOIN habit_logs hl ON h.id = hl.habit_id
+            GROUP BY h.id
+            ORDER BY h.display_order
+        """)
+        rows = [dict(r) for r in cursor.fetchall()]
+
+        # Compute streak for each habit
+        for row in rows:
+            cursor.execute("""
+                SELECT date(logged_at) as log_date
+                FROM habit_logs
+                WHERE habit_id = ?
+                GROUP BY date(logged_at)
+                ORDER BY log_date DESC
+            """, (row["id"],))
+            dates = [r["log_date"] for r in cursor.fetchall()]
+            row["streak"] = _compute_streak(dates)
+        return rows
+
+
+def log_habit(habit_id: int, note: str = None) -> dict:
+    """Log a habit as done now."""
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO habit_logs (habit_id, note) VALUES (?, ?)",
+            (habit_id, note)
+        )
+        conn.commit()
+        log_id = cursor.lastrowid
+        cursor.execute("SELECT * FROM habit_logs WHERE id = ?", (log_id,))
+        return dict(cursor.fetchone())
+
+
+def _compute_streak(dates: list[str]) -> int:
+    """Given sorted desc list of date strings, count current consecutive-day streak."""
+    from datetime import date, timedelta
+    streak = 0
+    check = date.today()
+    for d in dates:
+        try:
+            log_date = date.fromisoformat(d)
+        except ValueError:
+            continue
+        if log_date == check or (streak == 0 and log_date == check - timedelta(days=1)):
+            streak += 1
+            check = log_date - timedelta(days=1)
+        elif log_date < check:
+            break
+    return streak
 
 
 # Initialize database on module import

@@ -1,692 +1,1266 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Life Dashboard</title>
-    <style>
-        :root {
-            --bg-primary: #1a1a2e;
-            --bg-secondary: #16213e;
-            --bg-grid: #0f0f23;
-            --text-primary: #ffffff;
-            --text-secondary: #a0a0a0;
-            --border-color: #2a2a4e;
-            --time-line: #ff4757;
-            --total-hours: 19.5; /* 04:30-24:00 */
-            --hour-height: calc((100vh - 80px) / var(--total-hours));
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Life OS</title>
+<style>
+/* ─── RESET ──────────────────────────────────────────────────────────────── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; }
+button { cursor: pointer; font: inherit; border: none; background: none; }
+a { color: inherit; text-decoration: none; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+/* ─── FONTS ──────────────────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-            overflow: hidden;
-        }
+/* ─── NAV ────────────────────────────────────────────────────────────────── */
+body { display: flex; font-family: 'Space Grotesk', system-ui, sans-serif; background: #080810; color: #e0e0f0; }
 
-        /* Header */
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 24px;
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-color);
-            height: 60px;
-        }
+.nav {
+    width: 56px; height: 100vh; background: #05050e;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 16px 0; gap: 4px; flex-shrink: 0;
+    border-right: 1px solid #15152a; z-index: 100;
+}
+.nav-logo {
+    font-size: 18px; font-weight: 700; color: #7c6af7;
+    margin-bottom: 12px; letter-spacing: -1px;
+    font-family: 'Space Mono', monospace;
+}
+.nav-item {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; transition: all .2s; position: relative;
+    color: #555; flex-shrink: 0;
+}
+.nav-item:hover { background: #12122a; color: #e0e0f0; transform: scale(1.1); }
+.nav-item.active { background: #1a1a3a; color: #7c6af7; box-shadow: 0 0 12px #7c6af730; }
+.nav-item .tip {
+    position: absolute; left: calc(100% + 12px);
+    background: #1a1a3a; color: #e0e0f0;
+    padding: 4px 10px; border-radius: 6px; font-size: 12px;
+    white-space: nowrap; opacity: 0; pointer-events: none;
+    transition: opacity .15s; border: 1px solid #2a2a4a;
+}
+.nav-item:hover .tip { opacity: 1; }
+.nav-spacer { flex: 1; }
 
-        .header h1 {
-            font-size: 28px;
-            font-weight: 600;
-        }
+/* ─── PAGES ──────────────────────────────────────────────────────────────── */
+.pages { flex: 1; position: relative; overflow: hidden; }
+.page {
+    position: absolute; inset: 0;
+    display: none; opacity: 0;
+    transition: opacity .3s;
+    overflow: hidden;
+}
+.page.active { display: flex; flex-direction: column; opacity: 1; }
 
-        .header-date {
-            font-size: 24px;
-            color: var(--text-secondary);
-        }
+/* ══════════════════════════════════════════════════════════════════════════ */
+/* PAGE 1 — HOME (Command Center)                                            */
+/* ══════════════════════════════════════════════════════════════════════════ */
+#page-home {
+    background: #080810;
+    background-image:
+        radial-gradient(ellipse 60% 40% at 50% 0%, #1a1040 0%, transparent 60%),
+        linear-gradient(#15152805 1px, transparent 1px),
+        linear-gradient(90deg, #15152805 1px, transparent 1px);
+    background-size: 100% 100%, 32px 32px, 32px 32px;
+}
+.home-header {
+    padding: 28px 32px 0;
+    display: flex; align-items: flex-start; justify-content: space-between;
+    flex-shrink: 0;
+}
+.home-clock-block {}
+.home-time {
+    font-family: 'Space Mono', monospace;
+    font-size: clamp(52px, 7vw, 86px);
+    font-weight: 700; letter-spacing: -3px;
+    color: #fff;
+    line-height: 1;
+    text-shadow: 0 0 40px #7c6af740;
+}
+.home-date { font-size: 15px; color: #5a5a7a; margin-top: 6px; letter-spacing: .5px; }
+.home-header-right { text-align: right; }
+.home-greeting { font-size: 13px; color: #7070a0; }
+.home-status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 20px;
+    background: #12122a; border: 1px solid #2a2a4a;
+    font-size: 12px; color: #7c6af7; margin-top: 8px;
+    font-family: 'Space Mono', monospace;
+}
+.pulse { width: 7px; height: 7px; border-radius: 50%; background: #2ecc71; animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{box-shadow:0 0 0 0 #2ecc7160} 50%{box-shadow:0 0 0 5px transparent} }
 
-        .controls {
-            display: flex;
-            gap: 16px;
-            align-items: center;
-        }
+.home-cards {
+    flex: 1; padding: 24px 32px 28px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: auto auto;
+    gap: 14px; overflow: hidden;
+}
+.hcard {
+    background: #0d0d22;
+    border: 1px solid #1e1e38;
+    border-radius: 14px; padding: 18px 20px;
+    position: relative; overflow: hidden;
+    transition: border-color .2s, transform .2s;
+    cursor: pointer;
+}
+.hcard:hover { border-color: #3a3a6a; transform: translateY(-2px); }
+.hcard::before {
+    content: ''; position: absolute; inset: 0; opacity: 0;
+    transition: opacity .3s;
+}
+.hcard:hover::before { opacity: 1; }
+.hcard-accent {
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    border-radius: 14px 14px 0 0;
+}
+.hcard-icon { font-size: 26px; margin-bottom: 10px; }
+.hcard-label { font-size: 10px; color: #4a4a6a; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; font-family: 'Space Mono', monospace; }
+.hcard-value { font-size: 28px; font-weight: 700; line-height: 1; color: #fff; font-variant-numeric: tabular-nums; }
+.hcard-sub { font-size: 12px; color: #5a5a7a; margin-top: 6px; }
+.hcard-wide { grid-column: span 2; }
 
-        .day-selector {
-            display: flex;
-            gap: 8px;
-        }
+/* accents per card */
+.hcard-time  .hcard-accent { background: linear-gradient(90deg, #e74c3c, #e67e22); }
+.hcard-cal   .hcard-accent { background: linear-gradient(90deg, #3498db, #9b59b6); }
+.hcard-habit .hcard-accent { background: linear-gradient(90deg, #2ecc71, #1abc9c); }
+.hcard-cam   .hcard-accent { background: linear-gradient(90deg, #1abc9c, #16a085); }
+.hcard-tv    .hcard-accent { background: linear-gradient(90deg, #e74c3c, #c0392b); }
+.hcard-fin   .hcard-accent { background: linear-gradient(90deg, #f39c12, #d68910); }
 
-        .day-btn {
-            width: 48px;
-            height: 48px;
-            border: 2px solid var(--border-color);
-            background: transparent;
-            color: var(--text-primary);
-            font-size: 20px;
-            font-weight: 600;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
+/* ══════════════════════════════════════════════════════════════════════════ */
+/* PAGE 2 — TIME (Memento Mori)                                              */
+/* ══════════════════════════════════════════════════════════════════════════ */
+#page-time {
+    background: #0a0800;
+    background-image: radial-gradient(ellipse 80% 50% at 50% 100%, #2a1500 0%, transparent 60%);
+    align-items: center; justify-content: center;
+    font-family: 'Playfair Display', Georgia, serif;
+}
+.time-inner { text-align: center; width: 100%; max-width: 700px; padding: 32px; }
+.time-big {
+    font-size: clamp(72px, 12vw, 140px);
+    font-weight: 700;
+    color: #c8920a;
+    letter-spacing: -4px;
+    line-height: 1;
+    font-family: 'Space Mono', monospace;
+    text-shadow: 0 0 60px #c8920a60;
+}
+.time-date-serif { font-size: 20px; color: #6a5020; margin: 8px 0 32px; font-style: italic; letter-spacing: 2px; }
+.time-divider { width: 100%; height: 1px; background: linear-gradient(90deg, transparent, #4a3010, transparent); margin: 24px 0; }
+.time-counters { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 24px; }
+.tc-item { text-align: left; }
+.tc-label { font-size: 10px; color: #4a3010; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; font-family: 'Space Mono', monospace; }
+.tc-value { font-size: 36px; font-weight: 700; color: #c8920a; font-family: 'Space Mono', monospace; line-height: 1; font-variant-numeric: tabular-nums; }
+.tc-sub { font-size: 12px; color: #4a3010; margin-top: 4px; }
+.tc-bar-bg { height: 3px; background: #1a1000; border-radius: 2px; margin-top: 10px; overflow: hidden; }
+.tc-bar-fg { height: 100%; background: linear-gradient(90deg, #c8920a, #e8b02a); border-radius: 2px; transition: width 1s; }
+.memento { font-style: italic; font-size: 14px; color: #3a2500; letter-spacing: 3px; text-transform: uppercase; margin-top: 24px; }
+.time-milestone { margin-top: 20px; padding: 16px 20px; border: 1px solid #2a1500; border-radius: 10px; background: #0f0900; }
 
-        .day-btn:hover {
-            border-color: var(--time-line);
-        }
+/* ══════════════════════════════════════════════════════════════════════════ */
+/* PAGE 3 — HABITS (Terminal RPG)                                            */
+/* ══════════════════════════════════════════════════════════════════════════ */
+#page-habits {
+    background: #000d00;
+    font-family: 'Space Mono', monospace;
+    color: #00ff41;
+    background-image: repeating-linear-gradient(0deg, transparent, transparent 2px, #00ff0404 2px, #00ff0404 4px);
+}
+.habits-header {
+    padding: 24px 32px 16px; flex-shrink: 0;
+    border-bottom: 1px solid #00ff1020;
+}
+.habits-title { font-size: 11px; letter-spacing: 3px; color: #005a10; margin-bottom: 6px; }
+.habits-prompt { font-size: 22px; font-weight: 700; color: #00ff41; }
+.habits-prompt::before { content: '> '; color: #00aa20; }
+.habits-body { flex: 1; padding: 24px 32px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+.habit-entry {
+    border: 1px solid #00ff1025;
+    border-radius: 8px; padding: 16px 20px;
+    background: #000800;
+    transition: border-color .2s, background .2s;
+    position: relative; overflow: hidden;
+}
+.habit-entry::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #00ff41; opacity: .3; transition: opacity .2s; }
+.habit-entry:hover { border-color: #00ff1060; background: #001200; }
+.habit-entry:hover::before { opacity: 1; }
+.habit-entry.done-today { border-color: #00ff4140; }
+.habit-entry.done-today::before { background: #00ff41; opacity: 1; }
+.he-top { display: flex; align-items: center; gap: 14px; }
+.he-emoji { font-size: 22px; width: 32px; text-align: center; filter: saturate(0) brightness(1.5); }
+.habit-entry.done-today .he-emoji { filter: none; }
+.he-name { flex: 1; font-size: 16px; font-weight: 700; color: #00cc30; }
+.habit-entry.done-today .he-name { color: #00ff41; }
+.he-streak { font-size: 11px; color: #005a10; }
+.habit-entry.done-today .he-streak { color: #00aa20; }
+.he-btn {
+    padding: 6px 16px; border-radius: 4px;
+    border: 1px solid #00ff1040; color: #005a10;
+    font-family: 'Space Mono', monospace; font-size: 12px;
+    transition: all .15s; letter-spacing: 1px;
+}
+.he-btn:hover { border-color: #00ff41; color: #00ff41; background: #00ff0810; }
+.he-btn.logged { border-color: #00ff4180; color: #00ff41; background: #00ff0820; }
+.he-bar-wrap { margin-top: 10px; }
+.he-meta { display: flex; justify-content: space-between; font-size: 10px; color: #005a10; margin-bottom: 5px; }
+.he-bar-bg { height: 4px; background: #001500; border-radius: 2px; }
+.he-bar-fg { height: 100%; background: linear-gradient(90deg, #00aa20, #00ff41); border-radius: 2px; }
+.habits-footer { padding: 12px 32px 20px; border-top: 1px solid #00ff1020; font-size: 11px; color: #004010; }
 
-        .day-btn.active {
-            background: var(--time-line);
-            border-color: var(--time-line);
-        }
+/* ══════════════════════════════════════════════════════════════════════════ */
+/* PAGE 4 — CALENDAR (Paper Planner)                                         */
+/* ══════════════════════════════════════════════════════════════════════════ */
+#page-cal {
+    background: #f7f3ec;
+    color: #2c2416;
+    background-image:
+        radial-gradient(circle at 20% 80%, #e8dfc040 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, #d4c9a840 0%, transparent 50%);
+}
+.cal-header {
+    background: #fff; border-bottom: 2px solid #e8dfc0;
+    padding: 20px 28px 16px; flex-shrink: 0;
+    display: flex; align-items: center; gap: 20px;
+}
+.cal-header-left { flex: 1; }
+.cal-month { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; color: #2c2416; }
+.cal-year { font-size: 13px; color: #a09070; margin-top: 2px; letter-spacing: 1px; font-style: italic; }
+.cal-tabs { display: flex; gap: 4px; }
+.cal-tab {
+    padding: 7px 14px; border-radius: 6px; font-size: 13px;
+    color: #a09070; background: transparent;
+    transition: all .15s;
+}
+.cal-tab.active { background: #2c2416; color: #f7f3ec; }
+.cal-tab:hover:not(.active) { background: #e8dfc0; color: #2c2416; }
+.cal-refresh { padding: 7px 14px; border-radius: 6px; font-size: 13px; border: 1px solid #e8dfc0; color: #a09070; transition: all .15s; }
+.cal-refresh:hover { background: #e8dfc0; color: #2c2416; }
+.cal-body { flex: 1; overflow-y: auto; }
+.cal-day-wrap { display: flex; overflow: hidden; height: 100%; }
+.cal-time-col { width: 56px; background: #faf7f0; border-right: 1px solid #e8dfc0; flex-shrink: 0; padding-top: 24px; position: relative; }
+.cal-t-label { position: absolute; font-size: 11px; color: #b0a080; right: 8px; transform: translateY(-50%); font-family: 'Playfair Display', serif; font-style: italic; }
+.cal-days { flex: 1; display: flex; }
+.cal-day-col { flex: 1; border-right: 1px solid #e8dfc0; position: relative; display: flex; flex-direction: column; }
+.cal-day-col:last-child { border-right: none; }
+.cal-day-hdr { padding: 12px 10px 10px; border-bottom: 1px solid #e8dfc0; flex-shrink: 0; font-family: 'Playfair Display', serif; }
+.cal-day-name { font-size: 11px; color: #a09070; letter-spacing: 1px; text-transform: uppercase; }
+.cal-day-num { font-size: 24px; font-weight: 700; color: #2c2416; line-height: 1; margin-top: 2px; }
+.cal-day-hdr.today { background: #fdf5e0; }
+.cal-day-hdr.today .cal-day-num { color: #c0780a; }
+.cal-day-body { position: relative; flex: 1; }
+.cal-hour-line { position: absolute; left: 0; right: 0; border-top: 1px solid #e8dfc010; }
+.cal-half-line  { position: absolute; left: 0; right: 0; border-top: 1px dashed #e8dfc010; opacity: .5; }
+.cal-event {
+    position: absolute; left: 4px; right: 4px;
+    border-radius: 5px; padding: 4px 8px; overflow: hidden;
+    font-size: 12px; z-index: 5;
+    box-shadow: 0 1px 4px rgba(0,0,0,.15);
+}
+.cal-event-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-event-time  { font-size: 10px; opacity: .8; font-family: 'Space Mono', monospace; margin-top: 1px; }
+.cal-now-line { position: absolute; left: 0; right: 0; height: 2px; background: #c0780a; z-index: 10; box-shadow: 0 0 6px #c0780a80; }
+.cal-now-dot  { position: absolute; left: -5px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: #c0780a; }
 
-        .refresh-btn, .control-btn {
-            padding: 12px 24px;
-            background: var(--bg-secondary);
-            border: 2px solid var(--border-color);
-            color: var(--text-primary);
-            font-size: 18px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
+/* ══════════════════════════════════════════════════════════════════════════ */
+/* PAGE 5 — CAMERA (Surveillance)                                            */
+/* ══════════════════════════════════════════════════════════════════════════ */
+#page-cam {
+    background: #000;
+    font-family: 'Space Mono', monospace;
+}
+#page-cam::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 50;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,0,.015) 2px, rgba(0,255,0,.015) 4px);
+}
+.cam-header { padding: 16px 24px 12px; border-bottom: 1px solid #0a3a0a; display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+.cam-title { font-size: 11px; letter-spacing: 3px; color: #005a00; flex: 1; }
+.cam-rec { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #00cc00; }
+.cam-rec-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff3333; animation: blink 1.2s step-end infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.cam-timestamp { font-size: 10px; color: #005a00; }
+.cam-body { flex: 1; display: flex; gap: 0; overflow: hidden; min-height: 0; }
+.cam-main { flex: 1; display: flex; flex-direction: column; padding: 16px; position: relative; min-height: 0; }
+.cam-frame-outer {
+    flex: 1; min-height: 0;
+    border: 1px solid #1a4a1a; border-radius: 4px;
+    position: relative; overflow: hidden; background: #050f05;
+}
+.cam-frame-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cam-overlay {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 8px; color: #1a5a1a; font-size: 13px;
+}
+.cam-corner { position: absolute; width: 20px; height: 20px; border-color: #00cc00; border-style: solid; opacity: .5; }
+.cam-corner.tl { top: 8px; left: 8px; border-width: 2px 0 0 2px; }
+.cam-corner.tr { top: 8px; right: 8px; border-width: 2px 2px 0 0; }
+.cam-corner.bl { bottom: 8px; left: 8px; border-width: 0 0 2px 2px; }
+.cam-corner.br { bottom: 8px; right: 8px; border-width: 0 2px 2px 0; }
+.cam-hud-ts { position: absolute; bottom: 10px; left: 12px; font-size: 10px; color: #00aa00; letter-spacing: 1px; }
+.cam-hud-ch { position: absolute; top: 10px; left: 12px; font-size: 10px; color: #00aa00; }
+.cam-hud-status { position: absolute; top: 10px; right: 12px; font-size: 10px; color: #00aa00; }
+.cam-sidebar { width: 260px; border-left: 1px solid #0a3a0a; display: flex; flex-direction: column; padding: 16px; gap: 12px; overflow-y: auto; }
+.cam-sb-title { font-size: 9px; letter-spacing: 2px; color: #003a00; text-transform: uppercase; margin-bottom: 4px; }
+.cam-stat-row { display: flex; justify-content: space-between; font-size: 11px; padding: 6px 0; border-bottom: 1px solid #0a2a0a; }
+.cam-stat-key { color: #005a00; }
+.cam-stat-val { color: #00cc00; }
+.cam-activity { flex: 1; overflow-y: auto; }
+.cam-act-item { padding: 6px 0; border-bottom: 1px solid #071507; font-size: 11px; }
+.cam-act-time { color: #005a00; font-size: 9px; margin-bottom: 2px; }
+.cam-act-text { color: #00aa00; line-height: 1.4; }
+.cam-none { color: #003a00; font-size: 11px; padding: 12px 0; text-align: center; }
 
-        .refresh-btn:hover, .control-btn:hover {
-            border-color: var(--time-line);
-        }
+/* ══════════════════════════════════════════════════════════════════════════ */
+/* PAGE 6 — FINANCE (Bloomberg Terminal)                                     */
+/* ══════════════════════════════════════════════════════════════════════════ */
+#page-fin {
+    background: #0a0800;
+    font-family: 'Space Mono', monospace;
+    color: #ff9900;
+}
+.fin-header { padding: 14px 24px; border-bottom: 1px solid #2a1a00; display: flex; align-items: center; gap: 20px; flex-shrink: 0; }
+.fin-title-block { flex: 1; }
+.fin-title { font-size: 11px; letter-spacing: 3px; color: #5a3a00; }
+.fin-subtitle { font-size: 20px; font-weight: 700; color: #ff9900; margin-top: 2px; }
+.fin-ticker {
+    overflow: hidden; height: 32px;
+    border-top: 1px solid #2a1a00; border-bottom: 1px solid #2a1a00;
+    flex-shrink: 0; background: #050400; display: flex; align-items: center;
+    font-size: 12px;
+}
+.fin-ticker-inner { display: flex; gap: 32px; animation: ticker 30s linear infinite; white-space: nowrap; padding-left: 100%; }
+@keyframes ticker { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+.fin-t-item { color: #cc7700; }
+.fin-t-item.up { color: #00cc44; }
+.fin-t-item.dn { color: #cc2200; }
+.fin-body { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 0; overflow: hidden; }
+.fin-panel { padding: 20px 24px; border-right: 1px solid #1a0e00; border-bottom: 1px solid #1a0e00; overflow-y: auto; }
+.fin-panel:nth-child(2n) { border-right: none; }
+.fin-panel-title { font-size: 9px; letter-spacing: 2.5px; color: #5a3a00; text-transform: uppercase; margin-bottom: 14px; }
+.fin-big-num { font-size: 40px; font-weight: 700; color: #ff9900; line-height: 1; font-variant-numeric: tabular-nums; }
+.fin-big-sub { font-size: 11px; color: #5a3a00; margin-top: 6px; }
+.fin-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1a0e00; font-size: 12px; }
+.fin-row-key { color: #5a3a00; }
+.fin-row-val { color: #ff9900; font-variant-numeric: tabular-nums; }
+.fin-row-val.good { color: #00cc44; }
+.fin-row-val.bad  { color: #cc2200; }
+.fin-setup-msg { color: #3a2000; font-size: 12px; line-height: 1.7; padding: 8px 0; }
+.fin-setup-cmd { color: #cc7700; background: #100800; padding: 10px 14px; border-radius: 4px; border: 1px solid #2a1a00; font-size: 11px; margin-top: 10px; display: block; }
 
-        .control-btn.active {
-            background: var(--time-line);
-            border-color: var(--time-line);
-        }
+/* ══════════════════════════════════════════════════════════════════════════ */
+/* PAGE 7 — CONTENT / TV                                                     */
+/* ══════════════════════════════════════════════════════════════════════════ */
+#page-tv {
+    background: #04000a;
+    align-items: center; justify-content: center;
+    background-image: radial-gradient(ellipse 60% 60% at 50% 50%, #1a0030 0%, #04000a 70%);
+}
+.tv-wrap { width: 100%; max-width: 740px; padding: 32px; }
+.tv-screen {
+    border: 3px solid #2a1a3a;
+    border-radius: 16px; overflow: hidden;
+    background: #000; position: relative;
+    box-shadow: 0 0 60px #6000aa30, 0 0 0 1px #1a0a2a inset;
+    margin-bottom: 24px;
+}
+.tv-screen::before {
+    content: ''; position: absolute; inset: 0; z-index: 5; pointer-events: none;
+    background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(255,255,255,.015) 3px, rgba(255,255,255,.015) 4px);
+}
+.tv-now {
+    background: #0a0010; padding: 28px 32px;
+    display: flex; align-items: center; gap: 24px;
+}
+.tv-slot-emoji { font-size: 52px; flex-shrink: 0; }
+.tv-slot-info { flex: 1; }
+.tv-slot-mode { font-size: 10px; letter-spacing: 3px; color: #6030a0; text-transform: uppercase; margin-bottom: 6px; font-family: 'Space Mono', monospace; }
+.tv-slot-name { font-size: 28px; font-weight: 700; color: #e0c0ff; font-family: 'Playfair Display', serif; }
+.tv-slot-mood { font-size: 13px; color: #6030a0; margin-top: 6px; font-style: italic; }
+.tv-channel-bar { background: #060010; border-top: 1px solid #1a0a2a; padding: 14px 32px; display: flex; gap: 8px; align-items: center; overflow-x: auto; }
+.tv-ch-pill {
+    flex-shrink: 0; padding: 6px 14px; border-radius: 20px; font-size: 12px;
+    border: 1px solid #2a1a3a; color: #5030a0; cursor: pointer; transition: all .15s;
+    font-family: 'Space Mono', monospace;
+}
+.tv-ch-pill:hover { border-color: #9060d0; color: #e0c0ff; background: #1a0a2a; }
+.tv-ch-pill a { display: block; }
+.tv-schedule { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.tv-sched-card {
+    background: #06000e; border: 1px solid #1a0a2a; border-radius: 10px;
+    padding: 14px 16px; cursor: pointer; transition: border-color .15s;
+}
+.tv-sched-card:hover { border-color: #4020a0; }
+.tv-sched-card.current { border-color: #6030a0; background: #0c001a; }
+.tv-sched-emoji { font-size: 20px; margin-bottom: 8px; }
+.tv-sched-label { font-size: 10px; letter-spacing: 2px; color: #4020a0; text-transform: uppercase; font-family: 'Space Mono', monospace; margin-bottom: 4px; }
+.tv-sched-time { font-size: 12px; color: #3010a0; font-family: 'Space Mono', monospace; }
+.tv-sched-name { font-size: 14px; color: #c0a0f0; margin-top: 4px; font-family: 'Playfair Display', serif; }
 
-        .last-updated {
-            font-size: 14px;
-            color: var(--text-secondary);
-            margin-right: 16px;
-        }
+/* TV slot progress */
+.tv-slot-progress { margin: 12px 0 16px; }
+.tv-sp-label { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: 2px; color: #4020a0; font-family: 'Space Mono', monospace; text-transform: uppercase; margin-bottom: 6px; }
+.tv-sp-bar-bg { height: 6px; background: #0a0020; border-radius: 3px; overflow: hidden; }
+.tv-sp-bar-fg { height: 100%; background: linear-gradient(90deg, #4020a0, #9060d0); border-radius: 3px; transition: width 60s; }
 
-        /* Rotated state - 90 degrees clockwise */
-        /* After rotation: visual width = original height, visual height = original width */
-        body.rotated {
-            width: 100vh;
-            height: 100vw;
-            transform: rotate(90deg);
-            transform-origin: top left;
-            position: absolute;
-            top: 0;
-            left: 100%;
-            overflow: hidden;
-        }
+/* ─── SHARED UTILITIES ───────────────────────────────────────────────────── */
+.tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; letter-spacing: 1px; font-family: 'Space Mono', monospace; }
+.tag-green { background: #0a2a0a; color: #2ecc71; border: 1px solid #1a5a1a; }
+.tag-amber { background: #2a1500; color: #f39c12; border: 1px solid #5a3000; }
+.tag-red   { background: #2a0a0a; color: #e74c3c; border: 1px solid #5a1a1a; }
 
-        body.rotated .header {
-            height: 50px;
-            padding: 6px 12px;
-            flex-wrap: nowrap;
-        }
+/* progress mini */
+.mini-bar { height: 3px; background: #1a1a2a; border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.mini-bar-fg { height: 100%; border-radius: 2px; transition: width .8s; }
 
-        body.rotated .header h1 {
-            font-size: 18px;
-            flex-shrink: 0;
-        }
+/* NOC device status strip */
+.noc-strip { display: flex; gap: 10px; padding: 8px 32px 12px; flex-shrink: 0; flex-wrap: wrap; }
+.noc-device { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #4a4a6a; font-family: 'Space Mono', monospace; letter-spacing: .5px; }
+.noc-dot { width: 6px; height: 6px; border-radius: 50%; background: #2a2a4a; flex-shrink: 0; }
+.noc-dot.on { background: #2ecc71; box-shadow: 0 0 4px #2ecc7180; }
+.noc-dot.off { background: #e74c3c; }
 
-        body.rotated .header-date {
-            font-size: 14px;
-            flex-shrink: 1;
-            min-width: 0;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
+/* Keyboard shortcuts */
+.shortcut-hint { position: fixed; bottom: 16px; right: 20px; font-size: 10px; color: #2a2a3a; font-family: 'Space Mono', monospace; letter-spacing: 1px; }
 
-        body.rotated .controls {
-            gap: 6px;
-            flex-shrink: 0;
-        }
+/* Year progress on Time page */
+.time-year-prog { margin-top: 24px; text-align: left; }
+.typ-label { font-size: 10px; letter-spacing: 2px; color: #4a3010; font-family: 'Space Mono', monospace; margin-bottom: 8px; display: flex; justify-content: space-between; text-transform: uppercase; }
+.typ-bar-bg { height: 10px; background: #1a1000; border-radius: 5px; overflow: hidden; }
+.typ-bar-fg { height: 100%; background: linear-gradient(90deg, #6a3800, #c8920a, #ffd84a); border-radius: 5px; transition: width 1s; }
+.typ-sub { font-size: 11px; color: #3a2500; margin-top: 8px; font-style: italic; letter-spacing: 1px; text-align: center; }
 
-        body.rotated .last-updated {
-            display: none; /* Hide to save space when rotated */
-        }
-
-        body.rotated .day-btn {
-            width: 32px;
-            height: 32px;
-            font-size: 14px;
-        }
-
-        body.rotated .control-btn, body.rotated .refresh-btn {
-            padding: 6px 10px;
-            font-size: 14px;
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        body.rotated .calendar-container {
-            height: calc(100vw - 50px);
-        }
-
-        body.rotated .time-column {
-            width: 50px;
-        }
-
-        body.rotated .time-header-spacer {
-            height: 15px; /* Match day-header height in rotated mode */
-        }
-
-        body.rotated .time-label {
-            font-size: 12px;
-        }
-
-        body.rotated .day-header {
-            height: 15px;
-            font-size: 14px;
-        }
-
-        body.rotated .day-grid {
-            height: calc(100% - 15px);
-        }
-
-        body.rotated .event-title {
-            font-size: 14px;
-        }
-
-        body.rotated .event-time {
-            font-size: 11px;
-        }
-
-        /* Calendar grid */
-        .calendar-container {
-            display: flex;
-            height: calc(100vh - 60px);
-        }
-
-        .time-column {
-            width: 80px;
-            background: var(--bg-secondary);
-            border-right: 1px solid var(--border-color);
-            display: flex;
-            flex-direction: column;
-        }
-
-        .time-header-spacer {
-            height: 20px; /* Match day-header height */
-            flex-shrink: 0;
-        }
-
-        .time-labels {
-            position: relative;
-            flex: 1;
-        }
-
-        .time-label {
-            position: absolute;
-            left: 0;
-            right: 0;
-            display: flex;
-            align-items: flex-start;
-            justify-content: center;
-            font-size: 18px;
-            color: var(--text-secondary);
-            font-weight: 500;
-            transform: translateY(-0.5em); /* Center label on the line */
-        }
-
-        .days-container {
-            flex: 1;
-            display: flex;
-            overflow: hidden;
-        }
-
-        .day-column {
-            flex: 1;
-            border-right: 1px solid var(--border-color);
-            position: relative;
-        }
-
-        .day-column:last-child {
-            border-right: none;
-        }
-
-        .day-header {
-            height: 20px;
-            background: var(--bg-secondary);
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            font-weight: 600;
-        }
-
-        .day-header.today {
-            background: var(--time-line);
-        }
-
-        .day-grid {
-            position: relative;
-            height: calc(100% - 20px);
-        }
-
-        .hour-line {
-            position: absolute;
-            left: 0;
-            right: 0;
-            border-top: 1px solid var(--border-color);
-        }
-
-        .half-hour-line {
-            position: absolute;
-            left: 0;
-            right: 0;
-            border-top: 1px dashed var(--border-color);
-            opacity: 0.5;
-        }
-
-        /* Current time indicator */
-        .current-time-line {
-            position: absolute;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: var(--time-line);
-            z-index: 100;
-            box-shadow: 0 0 8px var(--time-line);
-        }
-
-        .current-time-dot {
-            position: absolute;
-            left: -6px;
-            top: -5px;
-            width: 12px;
-            height: 12px;
-            background: var(--time-line);
-            border-radius: 50%;
-        }
-
-        /* Events */
-        .event {
-            position: absolute;
-            left: 4px;
-            right: 4px;
-            border-radius: 6px;
-            padding: 6px 10px;
-            overflow: hidden;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            z-index: 10;
-        }
-
-        .event:hover {
-            transform: scale(1.02);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-            z-index: 20;
-        }
-
-        .event-title {
-            font-size: 20px;
-            font-weight: 600;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .event-time {
-            font-size: 16px;
-            opacity: 0.9;
-            margin-top: 2px;
-        }
-
-        .event-description {
-            font-size: 14px;
-            opacity: 0.8;
-            margin-top: 4px;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
-        /* Loading state */
-        .loading {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 24px;
-            color: var(--text-secondary);
-        }
-
-        /* Responsive for smaller screens */
-        @media (max-height: 1600px) {
-            .time-label {
-                font-size: 14px;
-            }
-            .event-title {
-                font-size: 16px;
-            }
-            .event-time {
-                font-size: 12px;
-            }
-        }
-    </style>
+/* Streak dots on Habits page */
+.he-dots { display: flex; gap: 3px; margin-top: 10px; overflow: hidden; }
+.he-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; background: #001500; border: 1px solid #002800; }
+.he-dot.filled { background: #00aa20; border-color: #00cc30; }
+.he-dot.today-done { background: #00ff41; border-color: #80ffa0; box-shadow: 0 0 6px #00ff4160; }
+</style>
 </head>
 <body>
-    <header class="header">
-        <h1>Life Dashboard</h1>
-        <span class="header-date" id="currentDate"></span>
-        <div class="controls">
-            <span class="last-updated" id="lastUpdated"></span>
-            <div class="day-selector">
-                <button class="day-btn" data-days="1">1</button>
-                <button class="day-btn" data-days="2">2</button>
-                <button class="day-btn active" data-days="3">3</button>
-                <button class="day-btn" data-days="4">4</button>
-                <button class="day-btn" data-days="5">5</button>
-            </div>
-            <button class="control-btn" onclick="toggleRotate()" title="Rotate 90°">⟳</button>
-            <button class="control-btn" onclick="toggleFullscreen()" title="Fullscreen">⛶</button>
-            <button class="refresh-btn" onclick="loadEvents()">↻</button>
-        </div>
-    </header>
 
-    <div class="calendar-container">
-        <div class="time-column">
-            <div class="time-header-spacer"></div>
-            <div class="time-labels" id="timeLabels"></div>
+<!-- ── LEFT NAV ──────────────────────────────────────────────────────────── -->
+<nav class="nav" id="mainNav">
+    <div class="nav-logo">OS</div>
+    <div class="nav-item active" data-page="home"  onclick="goPage('home')">🏠<span class="tip">Home</span></div>
+    <div class="nav-item"        data-page="time"  onclick="goPage('time')">⏳<span class="tip">Time · Memento Mori</span></div>
+    <div class="nav-item"        data-page="habits" onclick="goPage('habits')">⚡<span class="tip">Habits</span></div>
+    <div class="nav-item"        data-page="cal"   onclick="goPage('cal')">📅<span class="tip">Calendar</span></div>
+    <div class="nav-item"        data-page="cam"   onclick="goPage('cam')">👁<span class="tip">Camera · Eye</span></div>
+    <div class="nav-item"        data-page="fin"   onclick="goPage('fin')">₿<span class="tip">Finance</span></div>
+    <div class="nav-item"        data-page="tv"    onclick="goPage('tv')">📺<span class="tip">Content</span></div>
+    <div class="nav-spacer"></div>
+    <div class="nav-item" onclick="toggleFullscreen()" style="font-size:14px">⛶<span class="tip">Fullscreen</span></div>
+</nav>
+
+<!-- ── PAGES ─────────────────────────────────────────────────────────────── -->
+<div class="pages">
+
+<!-- HOME ──────────────────────────────────────────────────────────────────── -->
+<div class="page active" id="page-home">
+    <div class="home-header">
+        <div class="home-clock-block">
+            <div class="home-time" id="homeTime">00:00:00</div>
+            <div class="home-date" id="homeDate">Loading…</div>
         </div>
-        <div class="days-container" id="daysContainer"></div>
+        <div class="home-header-right">
+            <div class="home-greeting" id="homeGreeting">Life OS — Dashboard</div>
+            <div class="home-status-pill"><span class="pulse"></span><span id="homeStatusText">systems nominal</span></div>
+        </div>
     </div>
+    <div class="noc-strip" id="nocStrip">
+        <div class="noc-device"><div class="noc-dot" id="noc-desktop"></div>Desktop</div>
+        <div class="noc-device"><div class="noc-dot" id="noc-laptop"></div>Laptop</div>
+        <div class="noc-device"><div class="noc-dot" id="noc-vps"></div>VPS</div>
+        <div class="noc-device"><div class="noc-dot" id="noc-camera"></div>Camera</div>
+        <div class="noc-device"><div class="noc-dot" id="noc-gateway"></div>Gateway</div>
+    </div>
+    <div class="home-cards">
+        <div class="hcard hcard-time" onclick="goPage('time')">
+            <div class="hcard-accent"></div>
+            <div class="hcard-icon">⏳</div>
+            <div class="hcard-label">Time Left Today</div>
+            <div class="hcard-value" id="hc-today">—</div>
+            <div class="hcard-sub" id="hc-today-sub">hrs remaining</div>
+            <div class="mini-bar"><div class="mini-bar-fg" id="hc-today-bar" style="background:#e74c3c;width:0%"></div></div>
+        </div>
+        <div class="hcard hcard-cal hcard-wide" onclick="goPage('cal')">
+            <div class="hcard-accent"></div>
+            <div class="hcard-icon">📅</div>
+            <div class="hcard-label">Calendar</div>
+            <div class="hcard-value" id="hc-cal-next" style="font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">No events today</div>
+            <div class="hcard-sub" id="hc-cal-time">open calendar →</div>
+        </div>
+        <div class="hcard hcard-habit" onclick="goPage('habits')">
+            <div class="hcard-accent"></div>
+            <div class="hcard-icon">⚡</div>
+            <div class="hcard-label">Habits Today</div>
+            <div class="hcard-value"><span id="hc-hab-done">0</span><span style="font-size:16px;color:#3a5a3a"> / </span><span id="hc-hab-total" style="font-size:20px;color:#3a5a3a">5</span></div>
+            <div class="hcard-sub" id="hc-hab-sub">completed today</div>
+            <div class="mini-bar"><div class="mini-bar-fg" id="hc-hab-bar" style="background:#2ecc71;width:0%"></div></div>
+        </div>
+        <div class="hcard hcard-cam" onclick="goPage('cam')">
+            <div class="hcard-accent"></div>
+            <div class="hcard-icon">👁</div>
+            <div class="hcard-label">Camera</div>
+            <div class="hcard-value" style="font-size:16px" id="hc-cam-status">Offline</div>
+            <div class="hcard-sub">tap for live feed →</div>
+        </div>
+        <div class="hcard hcard-tv" onclick="goPage('tv')">
+            <div class="hcard-accent"></div>
+            <div class="hcard-icon">📺</div>
+            <div class="hcard-label">Now Playing</div>
+            <div class="hcard-value" style="font-size:16px" id="hc-tv-mode">—</div>
+            <div class="hcard-sub" id="hc-tv-mood">—</div>
+        </div>
+        <div class="hcard hcard-fin" onclick="goPage('fin')">
+            <div class="hcard-accent"></div>
+            <div class="hcard-icon">₿</div>
+            <div class="hcard-label">Finance</div>
+            <div class="hcard-value" style="font-size:16px;color:#5a4a2a">Not linked</div>
+            <div class="hcard-sub">Gmail sync needed</div>
+        </div>
+    </div>
+</div>
 
-    <script>
-        // Configuration
-        const START_HOUR = 4.5;  // 04:30
-        const END_HOUR = 24;     // 24:00
-        const TOTAL_HOURS = END_HOUR - START_HOUR;
+<!-- TIME ──────────────────────────────────────────────────────────────────── -->
+<div class="page" id="page-time">
+    <div class="time-inner">
+        <div class="time-big" id="timeBig">00:00:00</div>
+        <div class="time-date-serif" id="timeDateSerif">Saturday, 23rd of May</div>
+        <div style="display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:24px">
+            <span style="font-size:12px;color:#4a3010;letter-spacing:2px;font-style:italic">MEMENTO MORI</span>
+            <span style="color:#2a1500;font-size:10px">·</span>
+            <span class="tag tag-amber" id="timeBirthAge" style="font-style:normal">age —</span>
+            <button onclick="showRcSettings()" style="font-size:10px;color:#3a2000;padding:2px 8px;border:1px solid #2a1500;border-radius:4px;background:transparent;cursor:pointer;font-family:'Space Mono',monospace">⚙ set</button>
+        </div>
+        <div class="time-divider"></div>
+        <div class="time-counters" id="timeCounters"></div>
+        <div id="timeMilestone"></div>
+        <div class="time-divider"></div>
+        <div class="memento">tempus fugit · use it or lose it</div>
+        <div class="time-year-prog" id="timeYearProg"></div>
+    </div>
+    <!-- Settings modal (shared) -->
+    <div id="rcModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;align-items:center;justify-content:center">
+        <div style="background:#120d00;border:1px solid #3a2500;border-radius:12px;padding:28px;width:340px;font-family:'Space Mono',monospace">
+            <h3 style="color:#c8920a;margin-bottom:20px;font-family:'Playfair Display',serif;font-size:20px">Clock Settings</h3>
+            <label style="font-size:11px;color:#5a3a00;letter-spacing:1px">BIRTHDATE</label><br>
+            <input id="rcBirth" type="date" style="width:100%;margin:6px 0 16px;padding:10px;background:#0a0600;border:1px solid #2a1500;border-radius:6px;color:#c8920a;font-family:'Space Mono',monospace;font-size:14px">
+            <label style="font-size:11px;color:#5a3a00;letter-spacing:1px">MILESTONE DATE</label><br>
+            <input id="rcMile" type="date" style="width:100%;margin:6px 0 6px;padding:10px;background:#0a0600;border:1px solid #2a1500;border-radius:6px;color:#c8920a;font-family:'Space Mono',monospace;font-size:14px">
+            <input id="rcMileLabel" type="text" placeholder="label (e.g. Finland deadline)" style="width:100%;margin:0 0 20px;padding:10px;background:#0a0600;border:1px solid #2a1500;border-radius:6px;color:#c8920a;font-family:'Space Mono',monospace;font-size:13px">
+            <div style="display:flex;gap:10px;justify-content:flex-end">
+                <button onclick="closeRcSettings()" style="padding:8px 18px;border-radius:6px;border:1px solid #2a1500;color:#5a3a00;background:transparent;font-family:'Space Mono',monospace;cursor:pointer">cancel</button>
+                <button onclick="saveRcSettings()" style="padding:8px 18px;border-radius:6px;border:1px solid #c8920a;color:#c8920a;background:#1a0e00;font-family:'Space Mono',monospace;cursor:pointer">save</button>
+            </div>
+        </div>
+    </div>
+</div>
 
-        let displayDays = 3;
-        let events = [];
-        let calendars = {};
+<!-- HABITS ────────────────────────────────────────────────────────────────── -->
+<div class="page" id="page-habits">
+    <div class="habits-header">
+        <div class="habits-title">// DAILY_RITUALS.SYS</div>
+        <div class="habits-prompt">DISCIPLINE_TRACKER v2.1</div>
+    </div>
+    <div class="habits-body" id="habitsBody"></div>
+    <div class="habits-footer" id="habitsFooter">> ready for input_</div>
+</div>
 
-        // Get days from URL param
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.has('days')) {
-            displayDays = Math.min(5, Math.max(1, parseInt(urlParams.get('days'))));
+<!-- CALENDAR ──────────────────────────────────────────────────────────────── -->
+<div class="page" id="page-cal">
+    <div class="cal-header">
+        <div class="cal-header-left">
+            <div class="cal-month" id="calMonth">May</div>
+            <div class="cal-year" id="calYear">2026 — Personal Planner</div>
+        </div>
+        <div class="cal-tabs">
+            <button class="cal-tab active" data-days="1" onclick="calSetDays(1)">Day</button>
+            <button class="cal-tab" data-days="3" onclick="calSetDays(3)">3 Days</button>
+            <button class="cal-tab" data-days="5" onclick="calSetDays(5)">Week</button>
+        </div>
+        <button class="cal-refresh" onclick="loadEvents()">↻ refresh</button>
+        <button class="cal-refresh" onclick="showICalModal()" style="background:#fdf5e0;border-color:#c0780a;color:#c0780a" title="Connect Google Calendar">☁ sync</button>
+    </div>
+    <div class="cal-body">
+        <div class="cal-day-wrap">
+            <div class="cal-time-col" id="calTimeCol"></div>
+            <div class="cal-days" id="calDays"></div>
+        </div>
+    </div>
+</div>
+
+<!-- iCal sync modal -->
+<div id="icalModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:12px;padding:28px;width:500px;font-family:'Playfair Display',serif">
+        <h3 style="color:#2c2416;margin-bottom:6px;font-size:20px">Sync Google Calendar</h3>
+        <p style="font-size:12px;color:#a09070;margin-bottom:16px;font-family:system-ui">Paste your Google Calendar secret iCal URL (Settings → calendar → Secret address in iCal format)</p>
+        <input id="icalUrlInput" type="text" placeholder="https://calendar.google.com/calendar/ical/..."
+            style="width:100%;padding:10px;border:1px solid #e8dfc0;border-radius:6px;font-size:13px;margin-bottom:10px;font-family:monospace">
+        <div id="icalStatus" style="font-size:12px;color:#a09070;height:20px;font-family:system-ui"></div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px">
+            <button onclick="document.getElementById('icalModal').style.display='none'" style="padding:8px 18px;border-radius:6px;border:1px solid #e8dfc0;color:#a09070;background:transparent;cursor:pointer;font-family:system-ui">Cancel</button>
+            <button onclick="runICalSync()" style="padding:8px 18px;border-radius:6px;border:none;background:#2c2416;color:#f7f3ec;cursor:pointer;font-family:system-ui">Import Events</button>
+        </div>
+    </div>
+</div>
+
+<!-- CAMERA ────────────────────────────────────────────────────────────────── -->
+<div class="page" id="page-cam">
+    <div class="cam-header">
+        <div class="cam-title">CH-01 · INTERIOR · WIDE ANGLE</div>
+        <div class="cam-rec"><span class="cam-rec-dot"></span>REC</div>
+        <div class="cam-timestamp" id="camHudTs">00:00:00</div>
+    </div>
+    <div class="cam-body">
+        <div class="cam-main">
+            <div class="cam-frame-outer">
+                <img id="camFeedImg" class="cam-frame-img" src="" alt="" style="display:none">
+                <div class="cam-overlay" id="camFeedOverlay">
+                    <div style="font-size:11px;letter-spacing:4px;color:#002800;margin-bottom:8px">· · ·</div>
+                    <div style="font-size:11px;letter-spacing:2px" id="camFeedMsg">NO SIGNAL</div>
+                    <div style="font-size:9px;letter-spacing:2px;color:#002800;margin-top:12px">CAMERA OFFLINE · AWAITING FEED</div>
+                </div>
+                <div class="cam-corner tl"></div>
+                <div class="cam-corner tr"></div>
+                <div class="cam-corner bl"></div>
+                <div class="cam-corner br"></div>
+                <div class="cam-hud-ch">CAM-01 · TAPO C210</div>
+                <div class="cam-hud-status" id="camHudStatus">● OFFLINE</div>
+                <div class="cam-hud-ts" id="camHudFrameTs">--:--:--</div>
+            </div>
+        </div>
+        <div class="cam-sidebar">
+            <div>
+                <div class="cam-sb-title">System Status</div>
+                <div class="cam-stat-row"><span class="cam-stat-key">STATUS</span><span class="cam-stat-val" id="camSideStatus">OFFLINE</span></div>
+                <div class="cam-stat-row"><span class="cam-stat-key">LAST FRAME</span><span class="cam-stat-val" id="camSideFrame">--:--:--</span></div>
+                <div class="cam-stat-row"><span class="cam-stat-key">RESOLUTION</span><span class="cam-stat-val">2304×1296</span></div>
+                <div class="cam-stat-row"><span class="cam-stat-key">PROTOCOL</span><span class="cam-stat-val">RTSP/TCP</span></div>
+            </div>
+            <div class="cam-activity">
+                <div class="cam-sb-title">Activity Log</div>
+                <div id="camActivityLog"><div class="cam-none">[ no events ]</div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- FINANCE ───────────────────────────────────────────────────────────────── -->
+<div class="page" id="page-fin">
+    <div class="fin-header">
+        <div class="fin-title-block">
+            <div class="fin-title">FINANCIAL · TERMINAL · v1.0</div>
+            <div class="fin-subtitle">THE LEDGER</div>
+        </div>
+        <span class="tag tag-amber">GMAIL SYNC PENDING</span>
+    </div>
+    <div class="fin-ticker">
+        <div class="fin-ticker-inner" id="finTicker">
+            <span class="fin-t-item up">SAVINGS ▲ —</span>
+            <span class="fin-t-item">·</span>
+            <span class="fin-t-item dn">BURN RATE ▼ —</span>
+            <span class="fin-t-item">·</span>
+            <span class="fin-t-item">HDFC ● not linked</span>
+            <span class="fin-t-item">·</span>
+            <span class="fin-t-item">IOB ● not linked</span>
+            <span class="fin-t-item">·</span>
+            <span class="fin-t-item up">SAVINGS ▲ —</span>
+            <span class="fin-t-item">·</span>
+            <span class="fin-t-item dn">BURN RATE ▼ —</span>
+            <span class="fin-t-item">·</span>
+            <span class="fin-t-item">HDFC ● not linked</span>
+            <span class="fin-t-item">·</span>
+        </div>
+    </div>
+    <div class="fin-body">
+        <div class="fin-panel">
+            <div class="fin-panel-title">Net Savings</div>
+            <div class="fin-big-num">₹ —</div>
+            <div class="fin-big-sub">total accumulated</div>
+            <div style="margin-top:16px">
+                <div class="fin-row"><span class="fin-row-key">HDFC SAVINGS</span><span class="fin-row-val">not linked</span></div>
+                <div class="fin-row"><span class="fin-row-key">IOB SAVINGS</span><span class="fin-row-val">not linked</span></div>
+                <div class="fin-row"><span class="fin-row-key">INVESTMENTS</span><span class="fin-row-val">not linked</span></div>
+            </div>
+        </div>
+        <div class="fin-panel">
+            <div class="fin-panel-title">Burn Rate</div>
+            <div class="fin-big-num">₹ —<span style="font-size:14px;color:#5a3a00">/mo</span></div>
+            <div class="fin-big-sub">monthly spend rate</div>
+            <div style="margin-top:16px">
+                <div class="fin-row"><span class="fin-row-key">HDFC CC 1</span><span class="fin-row-val">not linked</span></div>
+                <div class="fin-row"><span class="fin-row-key">HDFC CC 2</span><span class="fin-row-val">not linked</span></div>
+                <div class="fin-row"><span class="fin-row-key">SWIGGY/BLINKIT</span><span class="fin-row-val">not linked</span></div>
+            </div>
+        </div>
+        <div class="fin-panel" style="grid-column:span 2">
+            <div class="fin-panel-title">Setup · Connect Gmail</div>
+            <div class="fin-setup-msg">
+                To activate finance tracking, connect your Gmail account. The system will parse HDFC/IOB bank alerts, credit card statements, and delivery receipts (Swiggy, Blinkit) in near real-time.
+                <br><br>
+                <strong style="color:#ff9900">Banks supported:</strong> HDFC, IOB · <strong style="color:#ff9900">Cards:</strong> HDFC CC ×2 · <strong style="color:#ff9900">Apps:</strong> Swiggy, Blinkit
+            </div>
+            <code class="fin-setup-cmd"># From ~/Programs/life-dashboard — run to configure:<br>
+# Set up Gmail OAuth → see IDEAS.md → Financial Module</code>
+        </div>
+    </div>
+</div>
+
+<!-- TV / CONTENT ──────────────────────────────────────────────────────────── -->
+<div class="page" id="page-tv">
+    <div class="tv-wrap">
+        <div style="text-align:center;margin-bottom:20px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;color:#4020a0">THE CONTENT SYSTEM · AUTO-PROGRAMMED</div>
+        <div class="tv-screen">
+            <div class="tv-now" id="tvNow">
+                <div class="tv-slot-emoji" id="tvSlotEmoji">📺</div>
+                <div class="tv-slot-info">
+                    <div class="tv-slot-mode" id="tvSlotMode">LOADING…</div>
+                    <div class="tv-slot-name" id="tvSlotName">Content System</div>
+                    <div class="tv-slot-mood" id="tvSlotMood">detecting time of day…</div>
+                </div>
+            </div>
+            <div class="tv-channel-bar" id="tvChannelBar"></div>
+        </div>
+        <div class="tv-slot-progress" id="tvSlotProgress"></div>
+        <div class="tv-schedule" id="tvScheduleGrid"></div>
+    </div>
+</div>
+
+</div><!-- .pages -->
+
+<div class="shortcut-hint">1-7 switch pages · F fullscreen</div>
+
+<script>
+// ─── ROUTER ───────────────────────────────────────────────────────────────────
+const PAGES = ['home','time','habits','cal','cam','fin','tv'];
+let currentPage = 'home';
+
+function goPage(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById('page-' + id).classList.add('active');
+    document.querySelector(`.nav-item[data-page="${id}"]`)?.classList.add('active');
+    currentPage = id;
+    onPageEnter(id);
+    location.hash = id;
+}
+function onPageEnter(id) {
+    if (id === 'cal') renderCalPage();
+    if (id === 'time') updateTimePage();
+    if (id === 'cam') { checkCamera(); refreshCamFrame(); }
+    if (id === 'tv') updateTV();
+    if (id === 'habits') loadHabits();
+}
+window.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT') return;
+    const n = parseInt(e.key);
+    if (n >= 1 && n <= 7) goPage(PAGES[n-1]);
+    if (e.key === 'f' || e.key === 'F') toggleFullscreen();
+});
+// Restore page from hash (also listen for hash changes)
+window.addEventListener('hashchange', () => {
+    const h = location.hash.replace('#','');
+    if (PAGES.includes(h)) goPage(h);
+});
+const initHash = location.hash.replace('#','');
+if (PAGES.includes(initHash)) goPage(initHash);
+else goPage('home');
+
+// ─── CLOCK ────────────────────────────────────────────────────────────────────
+const BIRTHDATE = () => localStorage.getItem('birthdate') || '1999-06-15';
+const LIFE_EXP  = () => parseInt(localStorage.getItem('life_expectancy') || '80');
+
+function tickClock() {
+    const now = new Date();
+    const ts = now.toLocaleTimeString('en-US', {hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit'});
+
+    // Home
+    document.getElementById('homeTime').textContent = ts;
+    document.getElementById('homeDate').textContent =
+        now.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'});
+    const h24 = now.getHours();
+    const greet = h24<5?'Late Night' : h24<9?'Good Morning' : h24<12?'Good Day' : h24<17?'Good Afternoon' : h24<21?'Good Evening' : 'Good Night';
+    const weekNum = Math.ceil(((now - new Date(now.getFullYear(),0,1))/86400000 + 1) / 7);
+    document.getElementById('homeGreeting').textContent = `${greet} — Week ${weekNum} of 52`;
+
+    // Time page
+    document.getElementById('timeBig').textContent = ts;
+    document.getElementById('timeDateSerif').textContent = formatDateSerif(now);
+
+    // Camera HUD
+    document.getElementById('camHudTs').textContent = ts;
+
+    // Home cards (quick refresh)
+    updateHomeCards(now);
+    if (currentPage === 'time') updateTimePage(now);
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+function formatDateSerif(d) {
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const ord = n => n + (['th','st','nd','rd'][((n%100-20)%10>3||(n%100-20)%10<1)&&n%100>20?0:(n%100-20)%10] || 'th');
+    return `${days[d.getDay()]}, ${ord(d.getDate())} of ${months[d.getMonth()]}`;
+}
+
+// ─── HOME CARDS ───────────────────────────────────────────────────────────────
+function updateHomeCards(now) {
+    now = now || new Date();
+    // Time left today
+    const midnight = new Date(now); midnight.setHours(24,0,0,0);
+    const hLeft = (midnight - now) / 3.6e6;
+    document.getElementById('hc-today').textContent = fmtHM(hLeft);
+    document.getElementById('hc-today-sub').textContent = 'hrs remaining today';
+    const todayPct = (1 - hLeft/24)*100;
+    document.getElementById('hc-today-bar').style.width = todayPct.toFixed(1) + '%';
+}
+
+// ─── TIME PAGE ────────────────────────────────────────────────────────────────
+function updateTimePage(now) {
+    now = now || new Date();
+    const birth = new Date(BIRTHDATE());
+    const age = (now - birth) / (365.25*86400000);
+    document.getElementById('timeBirthAge').textContent = `age ${age.toFixed(1)}`;
+
+    const midnight = new Date(now); midnight.setHours(24,0,0,0);
+    const hLeft = (midnight - now) / 3.6e6;
+    const todayPct = (1 - hLeft/24)*100;
+
+    const death = new Date(birth.getFullYear()+LIFE_EXP(), birth.getMonth(), birth.getDate());
+    const wLeft = Math.max(0, (death - now) / (7*86400000));
+    const lifePct = (1 - wLeft/(LIFE_EXP()*52.18))*100;
+
+    const wkHrsLeft = workHrsLeft(now);
+    const wkPct = (1 - wkHrsLeft/45)*100;
+
+    const endM = new Date(now.getFullYear(), now.getMonth()+1, 0);
+    const dLeft = endM.getDate() - now.getDate();
+    const dPct = (now.getDate()/endM.getDate())*100;
+
+    document.getElementById('timeCounters').innerHTML = [
+        { label:'TODAY', value: fmtHM(hLeft), sub:'hours remaining', pct: todayPct },
+        { label:'THIS WEEK', value: workHrsLeft(now).toFixed(0)+'h', sub:'working hours left', pct: wkPct },
+        { label:'THIS MONTH', value: dLeft, sub:'days remaining', pct: dPct },
+        { label:'YOUR LIFE', value: Math.round(wLeft).toLocaleString(), sub:'weeks remaining', pct: lifePct },
+    ].map(i => `
+        <div class="tc-item">
+            <div class="tc-label">${i.label}</div>
+            <div class="tc-value">${i.value}</div>
+            <div class="tc-sub">${i.sub}</div>
+            <div class="tc-bar-bg"><div class="tc-bar-fg" style="width:${Math.min(100,i.pct).toFixed(1)}%"></div></div>
+        </div>`).join('');
+
+    // Milestone
+    const mDate = localStorage.getItem('milestone_date');
+    const mLabel = localStorage.getItem('milestone_label') || 'Milestone';
+    if (mDate) {
+        const target = new Date(mDate);
+        const daysTo = Math.ceil((target - now)/86400000);
+        const clr = Math.abs(daysTo)<30 ? '#e74c3c' : Math.abs(daysTo)<90 ? '#e67e22' : '#c8920a';
+        document.getElementById('timeMilestone').innerHTML = `
+            <div class="time-milestone">
+                <div class="tc-label">🎯 ${esc(mLabel)}</div>
+                <div style="font-size:32px;font-weight:700;color:${clr};font-family:'Space Mono',monospace;margin:8px 0">
+                    ${daysTo >= 0 ? daysTo : Math.abs(daysTo)+' overdue'} <span style="font-size:16px;font-weight:400">days</span>
+                </div>
+                <div class="tc-sub">${target.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</div>
+            </div>`;
+    } else {
+        document.getElementById('timeMilestone').innerHTML = '';
+    }
+
+    // Year progress
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const yearEnd = new Date(now.getFullYear() + 1, 0, 1);
+    const yearPct = (now - yearStart) / (yearEnd - yearStart) * 100;
+    const dayOfYear = Math.floor((now - yearStart) / 86400000) + 1;
+    const daysLeft = (now.getFullYear() % 4 === 0 ? 366 : 365) - dayOfYear;
+    document.getElementById('timeYearProg').innerHTML = `
+        <div class="typ-label">
+            <span>YEAR ${now.getFullYear()} PROGRESS</span>
+            <span>DAY ${dayOfYear} · ${yearPct.toFixed(1)}%</span>
+        </div>
+        <div class="typ-bar-bg"><div class="typ-bar-fg" style="width:${yearPct.toFixed(2)}%"></div></div>
+        <div class="typ-sub">${daysLeft} days remaining in ${now.getFullYear()}</div>`;
+}
+
+function workHrsLeft(now) {
+    const wd = now.getDay();
+    if (wd===0||wd===6) return 0;
+    const h = now.getHours()+now.getMinutes()/60;
+    let t = h<9?9:h<18?18-h:0;
+    for (let d=wd+1;d<=5;d++) t+=9;
+    return Math.max(0,t);
+}
+function fmtHM(h) { const hh=Math.floor(h),mm=Math.round((h-hh)*60); return `${hh}:${String(mm).padStart(2,'0')}`; }
+
+// RC Settings
+function showRcSettings() {
+    document.getElementById('rcBirth').value = BIRTHDATE();
+    document.getElementById('rcMile').value = localStorage.getItem('milestone_date')||'';
+    document.getElementById('rcMileLabel').value = localStorage.getItem('milestone_label')||'';
+    document.getElementById('rcModal').style.display='flex';
+}
+function closeRcSettings() { document.getElementById('rcModal').style.display='none'; }
+function saveRcSettings() {
+    const b=document.getElementById('rcBirth').value;
+    const ml=document.getElementById('rcMile').value;
+    const ll=document.getElementById('rcMileLabel').value;
+    if(b) localStorage.setItem('birthdate',b);
+    if(ml) localStorage.setItem('milestone_date',ml);
+    if(ll) localStorage.setItem('milestone_label',ll);
+    closeRcSettings(); updateTimePage();
+}
+
+// ─── HABITS PAGE ──────────────────────────────────────────────────────────────
+let habitsData = [];
+async function loadHabits() {
+    try {
+        habitsData = await fetch('/api/habits').then(r=>r.json());
+        renderHabits();
+        updateHabitHomeCard();
+    } catch(e) {}
+}
+function renderHabits() {
+    const body = document.getElementById('habitsBody');
+    const done = habitsData.filter(h=>h.done_today>0).length;
+    body.innerHTML = habitsData.map(h => {
+        const doneToday = h.done_today>0;
+        const lastAgo = h.last_logged ? timeAgo(h.last_logged) : 'never';
+        const streakPct = Math.min(100, (h.streak/30)*100);
+        // 30-day streak dot visualization
+        const dotsArr = [];
+        for (let i = 29; i >= 0; i--) {
+            if (i === 0 && doneToday) dotsArr.push('<div class="he-dot today-done"></div>');
+            else if (i < (doneToday ? h.streak : h.streak)) dotsArr.push('<div class="he-dot filled"></div>');
+            else dotsArr.push('<div class="he-dot"></div>');
         }
+        return `<div class="habit-entry ${doneToday?'done-today':''}">
+            <div class="he-top">
+                <span class="he-emoji">${h.emoji}</span>
+                <span class="he-name">${esc(h.name)}</span>
+                <span class="he-streak">${h.streak>0?'🔥 '+h.streak+'d streak':''}</span>
+                <button class="he-btn ${doneToday?'logged':''}" onclick="logHabit(${h.id},this)">
+                    ${doneToday ? '[ DONE ✓ ]' : '[ LOG IT ]'}
+                </button>
+            </div>
+            <div class="he-dots">${dotsArr.join('')}</div>
+            <div class="he-bar-wrap">
+                <div class="he-meta">
+                    <span>${doneToday?'completed today':'last: '+lastAgo}</span>
+                    <span>${h.streak} day streak · ${streakPct.toFixed(0)}% of 30-day goal</span>
+                </div>
+                <div class="he-bar-bg"><div class="he-bar-fg" style="width:${streakPct.toFixed(1)}%"></div></div>
+            </div>
+        </div>`;
+    }).join('');
+    document.getElementById('habitsFooter').textContent =
+        `> ${done}/${habitsData.length} completed today · ${habitsData.filter(h=>h.streak>0).length} active streaks_`;
+}
+function updateHabitHomeCard() {
+    const done = habitsData.filter(h=>h.done_today>0).length;
+    const total = habitsData.length;
+    document.getElementById('hc-hab-done').textContent = done;
+    document.getElementById('hc-hab-total').textContent = total;
+    document.getElementById('hc-hab-bar').style.width = (total?done/total*100:0).toFixed(1)+'%';
+    document.getElementById('hc-hab-sub').textContent = done===total?'all done! 🔥':'completed today';
+}
+async function logHabit(id, btn) {
+    btn.disabled=true;
+    try {
+        await fetch(`/api/habits/${id}/log`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+        await loadHabits();
+    } catch(e) { btn.disabled=false; }
+}
+setInterval(loadHabits, 30000);
+loadHabits();
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            updateDateDisplay();
-            renderTimeColumn();
-            setupDayButtons();
-            loadCalendars().then(() => loadEvents());
+// ─── CALENDAR PAGE ────────────────────────────────────────────────────────────
+const CAL_START=4.5, CAL_END=24, CAL_HOURS=19.5;
+let calDays=3, events=[], calendars={};
 
-            // Update time indicator every minute
-            setInterval(updateCurrentTimeLine, 60000);
+async function loadCalendars() {
+    try { const d=await fetch('/api/calendars').then(r=>r.json()); d.forEach(c=>calendars[c.id]=c); } catch(e){}
+}
+async function loadEvents() {
+    const today=new Date(); today.setHours(0,0,0,0);
+    const end=new Date(today); end.setDate(end.getDate()+Math.max(calDays,3));
+    try {
+        events=await fetch(`/api/events?start=${today.toISOString()}&end=${end.toISOString()}`).then(r=>r.json());
+        renderCalPage();
+        updateCalHomeCard();
+    } catch(e){}
+}
+function calSetDays(n) {
+    calDays=n;
+    document.querySelectorAll('.cal-tab').forEach(b=>b.classList.toggle('active',parseInt(b.dataset.days)===n));
+    renderCalPage();
+}
+function renderCalPage() {
+    if (currentPage !== 'cal') return;
+    const now = new Date();
+    document.getElementById('calMonth').textContent = now.toLocaleDateString('en-US',{month:'long'});
+    document.getElementById('calYear').textContent = now.getFullYear()+' — Personal Planner';
+    // Time column
+    const tc = document.getElementById('calTimeCol');
+    tc.innerHTML = '';
+    const totalH = (tc.offsetHeight || 600);
+    for (let h=Math.ceil(CAL_START);h<=CAL_END;h++) {
+        const lbl=document.createElement('div');
+        lbl.className='cal-t-label';
+        lbl.style.top = ((h-CAL_START)/CAL_HOURS*100)+'%';
+        lbl.textContent = h===24?'00':String(h).padStart(2,'0');
+        tc.appendChild(lbl);
+    }
+    // Day columns
+    const container = document.getElementById('calDays');
+    container.innerHTML='';
+    const today=new Date(); today.setHours(0,0,0,0);
+    for (let i=0;i<calDays;i++) {
+        const d=new Date(today); d.setDate(d.getDate()+i);
+        const isToday = i===0;
+        const col=document.createElement('div'); col.className='cal-day-col';
+        const hdr=document.createElement('div');
+        hdr.className='cal-day-hdr'+(isToday?' today':'');
+        hdr.innerHTML=`<div class="cal-day-name">${['SUN','MON','TUE','WED','THU','FRI','SAT'][d.getDay()]}</div><div class="cal-day-num">${d.getDate()}</div>`;
+        const body=document.createElement('div');
+        body.className='cal-day-body';
+        body.dataset.date=d.toISOString().split('T')[0];
+        col.append(hdr,body); container.appendChild(col);
+        for (let h=Math.ceil(CAL_START);h<=CAL_END;h++) {
+            const l=document.createElement('div'); l.className='cal-hour-line';
+            l.style.top=((h-CAL_START)/CAL_HOURS*100)+'%'; body.appendChild(l);
+            if(h<CAL_END){const hl=document.createElement('div');hl.className='cal-half-line';hl.style.top=((h-CAL_START+.5)/CAL_HOURS*100)+'%';body.appendChild(hl);}
+        }
+    }
+    // Events
+    events.forEach(ev=>{
+        const start=new Date(ev.start_time), end=new Date(ev.end_time);
+        const date=start.toISOString().split('T')[0];
+        const body=document.querySelector(`.cal-day-body[data-date="${date}"]`);
+        if(!body) return;
+        const sh=start.getHours()+start.getMinutes()/60, eh=end.getHours()+end.getMinutes()/60;
+        if(eh<CAL_START||sh>CAL_END) return;
+        const top=Math.max(0,((sh-CAL_START)/CAL_HOURS*100));
+        const bot=Math.min(100,((eh-CAL_START)/CAL_HOURS*100));
+        const el=document.createElement('div'); el.className='cal-event';
+        const bright=(rgb=>rgb?(parseInt(rgb[1],16)*299+parseInt(rgb[2],16)*587+parseInt(rgb[3],16)*114)/1000:128)(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(ev.calendar_color||'#3498db'));
+        el.style.cssText=`top:${top}%;height:${bot-top}%;background:${ev.calendar_color||'#3498db'};color:${bright>128?'#000':'#fff'}`;
+        el.innerHTML=`<div class="cal-event-title">${esc(ev.title)}</div><div class="cal-event-time">${fmtT(start)}–${fmtT(end)}</div>`;
+        body.appendChild(el);
+    });
+    // Now line
+    document.querySelectorAll('.cal-now-line').forEach(e=>e.remove());
+    const nowH=now.getHours()+now.getMinutes()/60;
+    if(nowH>=CAL_START&&nowH<=CAL_END){
+        const nb=document.querySelector(`.cal-day-body[data-date="${now.toISOString().split('T')[0]}"]`);
+        if(nb){const nl=document.createElement('div');nl.className='cal-now-line';nl.style.top=((nowH-CAL_START)/CAL_HOURS*100)+'%';nl.innerHTML='<div class="cal-now-dot"></div>';nb.appendChild(nl);}
+    }
+}
+function updateCalHomeCard() {
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const todayEvs = events.filter(e=>new Date(e.start_time).toISOString().split('T')[0]===todayStr).sort((a,b)=>new Date(a.start_time)-new Date(b.start_time));
+    const upcoming = todayEvs.find(e=>new Date(e.start_time)>now) || todayEvs[todayEvs.length-1];
+    if (upcoming) {
+        document.getElementById('hc-cal-next').textContent = upcoming.title;
+        document.getElementById('hc-cal-time').textContent = fmtT(new Date(upcoming.start_time))+' — '+upcoming.calendar_name;
+    } else {
+        document.getElementById('hc-cal-next').textContent = 'No events today';
+        document.getElementById('hc-cal-time').textContent = 'open calendar →';
+    }
+}
+setInterval(()=>{ loadEvents(); if(currentPage==='cal') renderCalPage(); }, 15000);
+loadCalendars().then(loadEvents);
+setInterval(()=>{ if(currentPage==='cal') renderCalPage(); }, 30000);
 
-            // Auto-refresh every 15 seconds
-            setInterval(loadEvents, 15000);
+// ─── CAMERA ───────────────────────────────────────────────────────────────────
+let camOnline = false, lastFrameTs = null;
+async function checkCamera() {
+    try {
+        const s = await fetch('/api/camera/status').then(r=>r.json());
+        camOnline = s.online;
+        const online = camOnline;
+        document.getElementById('camHudStatus').textContent = online ? '● LIVE' : '● OFFLINE';
+        document.getElementById('camHudStatus').style.color = online ? '#00cc00' : '#cc3300';
+        document.getElementById('camSideStatus').textContent = online ? 'ONLINE' : 'OFFLINE';
+        document.getElementById('camSideStatus').style.color = online ? '#00cc00' : '#cc3300';
+        document.getElementById('hc-cam-status').textContent = online ? 'Live 🟢' : 'Offline';
+        if (online) refreshCamFrame();
+    } catch(e){}
+}
+async function refreshCamFrame() {
+    if (!camOnline) return;
+    try {
+        const resp = await fetch('/api/camera/frame?t='+Date.now());
+        if (resp.ok) {
+            const blob=await resp.blob(), burl=URL.createObjectURL(blob);
+            const img=document.getElementById('camFeedImg');
+            const old=img.src; img.src=burl; img.style.display='block';
+            document.getElementById('camFeedOverlay').style.display='none';
+            if(old&&old.startsWith('blob:')) URL.revokeObjectURL(old);
+            lastFrameTs=new Date();
+            const ts=lastFrameTs.toLocaleTimeString('en-US',{hour12:false});
+            document.getElementById('camHudFrameTs').textContent=ts;
+            document.getElementById('camSideFrame').textContent=ts;
+        } else { showCamOffline(); }
+    } catch(e){ showCamOffline(); }
+}
+function showCamOffline() {
+    document.getElementById('camFeedImg').style.display='none';
+    document.getElementById('camFeedOverlay').style.display='flex';
+    document.getElementById('camFeedMsg').textContent='NO SIGNAL · CAMERA OFFLINE';
+}
+async function loadActivity() {
+    try {
+        const data=await fetch('/api/activity').then(r=>r.json());
+        if(!data||!data.events||data.events.length===0) return;
+        const log=document.getElementById('camActivityLog');
+        log.innerHTML=data.events.slice(0,12).map(e=>`
+            <div class="cam-act-item">
+                <div class="cam-act-time">${timeAgo(e.ts)}</div>
+                <div class="cam-act-text">${esc(e.label||'scan')}</div>
+            </div>`).join('');
+    } catch(e){}
+}
+setInterval(checkCamera, 8000);
+setInterval(()=>{ if(camOnline&&currentPage==='cam') refreshCamFrame(); }, 5000);
+setInterval(loadActivity, 30000);
+checkCamera(); loadActivity();
 
-            // Restore rotation state and set correct hour height
-            if (localStorage.getItem('rotated') === 'true') {
-                document.body.classList.add('rotated');
-                document.documentElement.style.setProperty('--hour-height', 'calc((100vw - 50px - 15px) / 19.5)');
-            }
+// ─── TV / CONTENT ─────────────────────────────────────────────────────────────
+const TV_SCHED = [
+    {s:5,e:9,  label:'MORNING',   emoji:'🌅', name:'Rise & Plan',   mood:'motivation · stoicism · planning',
+     pl:[{n:'Morning Motivation',u:'https://www.youtube.com/results?search_query=morning+motivation+philosophy'},{n:'Stoic Lectures',u:'https://www.youtube.com/results?search_query=stoicism+lecture+2025'}]},
+    {s:9,e:13, label:'DEEP WORK', emoji:'🎯', name:'Focus Mode',    mood:'lo-fi · tutorials · no distractions',
+     pl:[{n:'Lo-Fi Study Music',u:'https://www.youtube.com/results?search_query=lofi+hiphop+study'},{n:'Tech Talks',u:'https://www.youtube.com/results?search_query=software+engineering+talk+2025'}]},
+    {s:13,e:17,label:'AFTERNOON', emoji:'☀️', name:'Create & Learn', mood:'creative · lighter content',
+     pl:[{n:'Linux/Tech Tutorials',u:'https://www.youtube.com/results?search_query=linux+tutorial+2025'},{n:'Documentary',u:'https://www.youtube.com/results?search_query=short+documentary'}]},
+    {s:17,e:21,label:'EVENING',   emoji:'🌆', name:'Wind Down',     mood:'travel · culture · reflection',
+     pl:[{n:'Travel Docs 4K',u:'https://www.youtube.com/results?search_query=4k+travel+documentary'},{n:'Nature',u:'https://www.youtube.com/results?search_query=nature+documentary+short'}]},
+    {s:21,e:24,label:'NIGHT',     emoji:'🌙', name:'Rest Mode',     mood:'ambient · calm · instrumental',
+     pl:[{n:'Ambient Sleep',u:'https://www.youtube.com/results?search_query=ambient+sleep+music+8+hours'},{n:'Rain Sounds',u:'https://www.youtube.com/results?search_query=rain+sleep+sounds'}]},
+    {s:0,e:5,  label:'LATE NIGHT',emoji:'🌌', name:'Silence',       mood:'deep work or sleep',
+     pl:[{n:'Deep Ambient Drone',u:'https://www.youtube.com/results?search_query=deep+ambient+drone+music'}]},
+];
+function updateTV() {
+    const h=new Date().getHours()+new Date().getMinutes()/60;
+    const slot=TV_SCHED.find(s=>h>=s.s&&h<s.e)||TV_SCHED[TV_SCHED.length-1];
+    document.getElementById('tvSlotEmoji').textContent=slot.emoji;
+    document.getElementById('tvSlotMode').textContent=slot.label+' · '+new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:false});
+    document.getElementById('tvSlotName').textContent=slot.name;
+    document.getElementById('tvSlotMood').textContent=slot.mood;
+    document.getElementById('tvChannelBar').innerHTML=slot.pl.map(p=>`
+        <div class="tv-ch-pill"><a href="${p.u}" target="_blank">▶ ${esc(p.n)}</a></div>`).join('');
+    // Slot progress
+    const slotDur = (slot.e > slot.s ? slot.e - slot.s : slot.e + 24 - slot.s);
+    const slotEl = h >= slot.s ? h - slot.s : h + 24 - slot.s;
+    const slotPct = Math.min(100, (slotEl / slotDur) * 100);
+    const minsLeft = Math.round((slotDur - slotEl) * 60);
+    document.getElementById('tvSlotProgress').innerHTML = `
+        <div class="tv-sp-label">
+            <span>${slot.label} SLOT PROGRESS</span>
+            <span>${minsLeft}min remaining · ${slotPct.toFixed(0)}%</span>
+        </div>
+        <div class="tv-sp-bar-bg"><div class="tv-sp-bar-fg" style="width:${slotPct.toFixed(1)}%"></div></div>`;
+    // Home card
+    document.getElementById('hc-tv-mode').textContent=slot.emoji+' '+slot.name;
+    document.getElementById('hc-tv-mood').textContent=slot.mood;
+    // Schedule grid
+    document.getElementById('tvScheduleGrid').innerHTML=TV_SCHED.map(s=>`
+        <div class="tv-sched-card ${s.s===slot.s?'current':''}">
+            <div class="tv-sched-emoji">${s.emoji}</div>
+            <div class="tv-sched-label">${s.label}</div>
+            <div class="tv-sched-time">${String(s.s).padStart(2,'0')}:00–${String(s.e).padStart(2,'0')}:00</div>
+            <div class="tv-sched-name">${s.name}</div>
+        </div>`).join('');
+}
+setInterval(updateTV, 60000);
+updateTV();
+
+// ─── FULLSCREEN ───────────────────────────────────────────────────────────────
+function toggleFullscreen() {
+    if(!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+    else document.exitFullscreen();
+}
+
+// ─── ICAL SYNC ────────────────────────────────────────────────────────────────
+function showICalModal() {
+    const saved = localStorage.getItem('ical_url') || '';
+    document.getElementById('icalUrlInput').value = saved;
+    document.getElementById('icalStatus').textContent = '';
+    document.getElementById('icalModal').style.display = 'flex';
+}
+async function runICalSync() {
+    const url = document.getElementById('icalUrlInput').value.trim();
+    if (!url) return;
+    const st = document.getElementById('icalStatus');
+    st.textContent = 'Importing…'; st.style.color = '#a09070';
+    try {
+        const r = await fetch('/api/ical/sync', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({url, calendar_id: 'computer'})
         });
+        const d = await r.json();
+        if (r.ok) {
+            localStorage.setItem('ical_url', url);
+            st.textContent = `✓ Imported ${d.imported} events (${d.skipped} skipped)`;
+            st.style.color = '#2ecc71';
+            loadEvents();
+        } else {
+            st.textContent = '✗ ' + (d.detail || 'sync failed');
+            st.style.color = '#e74c3c';
+        }
+    } catch(e) {
+        st.textContent = '✗ network error';
+        st.style.color = '#e74c3c';
+    }
+}
 
-        // Toggle rotation (90 degrees)
-        function toggleRotate() {
-            document.body.classList.toggle('rotated');
-            const isRotated = document.body.classList.contains('rotated');
-            localStorage.setItem('rotated', isRotated);
-
-            // Update CSS variable for hour height based on rotation
-            // When rotated: visual height = original width (100vw), header=50px, day-header=15px
-            // Normal: visual height = original height (100vh), header=60px, day-header=20px
-            // Total hours: 19.5 (04:30 to 24:00)
-            const root = document.documentElement;
-            if (isRotated) {
-                root.style.setProperty('--hour-height', 'calc((100vw - 50px - 15px) / 19.5)');
-            } else {
-                root.style.setProperty('--hour-height', 'calc((100vh - 60px - 20px) / 19.5)');
+// ─── NOC STATUS ───────────────────────────────────────────────────────────────
+async function loadDeviceStatus() {
+    try {
+        const devices = await fetch('/api/devices').then(r=>r.json());
+        const idMap = { Desktop:'noc-desktop', Laptop:'noc-laptop', VPS:'noc-vps', Camera:'noc-camera', Gateway:'noc-gateway' };
+        let onlineCount = 0;
+        devices.forEach(d => {
+            const el = document.getElementById(idMap[d.name]);
+            if (el) {
+                el.classList.toggle('on', d.online);
+                el.classList.toggle('off', !d.online);
             }
+            if (d.online) onlineCount++;
+        });
+        document.getElementById('homeStatusText').textContent =
+            onlineCount === devices.length ? 'systems nominal' : onlineCount + '/' + devices.length + ' devices online';
+    } catch(e) {}
+}
+setInterval(loadDeviceStatus, 30000);
+loadDeviceStatus();
 
-            // Re-render to apply new dimensions
-            renderDays();
-        }
-
-        // Toggle fullscreen mode
-        function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                    console.log('Fullscreen error:', err);
-                });
-            } else {
-                document.exitFullscreen();
-            }
-        }
-
-        // Update last updated timestamp
-        function updateLastUpdated() {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
-            document.getElementById('lastUpdated').textContent = `Updated: ${timeStr}`;
-        }
-
-        function updateDateDisplay() {
-            const now = new Date();
-            const options = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' };
-            document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', options);
-        }
-
-        function renderTimeColumn() {
-            const timeLabels = document.getElementById('timeLabels');
-            timeLabels.innerHTML = '';
-
-            // Position time labels to align with hour grid lines
-            for (let hour = Math.ceil(START_HOUR); hour <= END_HOUR; hour++) {
-                const label = document.createElement('div');
-                label.className = 'time-label';
-                label.textContent = hour === 24 ? '00:00' : `${hour.toString().padStart(2, '0')}:00`;
-                // Position at same percentage as grid lines (relative to time-labels container)
-                const topPercent = ((hour - START_HOUR) / TOTAL_HOURS) * 100;
-                label.style.top = `${topPercent}%`;
-                timeLabels.appendChild(label);
-            }
-        }
-
-        function setupDayButtons() {
-            const buttons = document.querySelectorAll('.day-btn');
-            buttons.forEach(btn => {
-                const days = parseInt(btn.dataset.days);
-                if (days === displayDays) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.remove('active');
-                }
-
-                btn.addEventListener('click', () => {
-                    displayDays = days;
-                    buttons.forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    renderDays();
-
-                    // Update URL
-                    const url = new URL(window.location);
-                    url.searchParams.set('days', days);
-                    window.history.replaceState({}, '', url);
-                });
-            });
-        }
-
-        async function loadCalendars() {
-            try {
-                const response = await fetch('/api/calendars');
-                const data = await response.json();
-                data.forEach(cal => {
-                    calendars[cal.id] = cal;
-                });
-            } catch (error) {
-                console.error('Failed to load calendars:', error);
-            }
-        }
-
-        async function loadEvents() {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            const endDate = new Date(today);
-            endDate.setDate(endDate.getDate() + displayDays);
-
-            const start = today.toISOString();
-            const end = endDate.toISOString();
-
-            try {
-                const response = await fetch(`/api/events?start=${start}&end=${end}`);
-                events = await response.json();
-                renderDays();
-                updateLastUpdated();
-            } catch (error) {
-                console.error('Failed to load events:', error);
-            }
-        }
-
-        function renderDays() {
-            const container = document.getElementById('daysContainer');
-            container.innerHTML = '';
-
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            for (let i = 0; i < displayDays; i++) {
-                const date = new Date(today);
-                date.setDate(date.getDate() + i);
-
-                const dayColumn = document.createElement('div');
-                dayColumn.className = 'day-column';
-                dayColumn.innerHTML = `
-                    <div class="day-header ${i === 0 ? 'today' : ''}">${formatDayHeader(date)}</div>
-                    <div class="day-grid" data-date="${date.toISOString().split('T')[0]}"></div>
-                `;
-                container.appendChild(dayColumn);
-            }
-
-            // Render hour lines
-            document.querySelectorAll('.day-grid').forEach(grid => {
-                for (let hour = Math.ceil(START_HOUR); hour <= END_HOUR; hour++) {
-                    const line = document.createElement('div');
-                    line.className = 'hour-line';
-                    line.style.top = `${((hour - START_HOUR) / TOTAL_HOURS) * 100}%`;
-                    grid.appendChild(line);
-
-                    // Half hour line
-                    if (hour < END_HOUR) {
-                        const halfLine = document.createElement('div');
-                        halfLine.className = 'half-hour-line';
-                        halfLine.style.top = `${((hour - START_HOUR + 0.5) / TOTAL_HOURS) * 100}%`;
-                        grid.appendChild(halfLine);
-                    }
-                }
-            });
-
-            renderEvents();
-            updateCurrentTimeLine();
-        }
-
-        function formatDayHeader(date) {
-            const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-            return `${days[date.getDay()]} ${date.getDate()}`;
-        }
-
-        function renderEvents() {
-            events.forEach(event => {
-                const startDate = new Date(event.start_time);
-                const endDate = new Date(event.end_time);
-                const dateStr = startDate.toISOString().split('T')[0];
-
-                const grid = document.querySelector(`.day-grid[data-date="${dateStr}"]`);
-                if (!grid) return;
-
-                const startHour = startDate.getHours() + startDate.getMinutes() / 60;
-                const endHour = endDate.getHours() + endDate.getMinutes() / 60;
-
-                // Skip events outside our time range
-                if (endHour < START_HOUR || startHour > END_HOUR) return;
-
-                const top = Math.max(0, ((startHour - START_HOUR) / TOTAL_HOURS) * 100);
-                const bottom = Math.min(100, ((endHour - START_HOUR) / TOTAL_HOURS) * 100);
-                const height = bottom - top;
-
-                const eventEl = document.createElement('div');
-                eventEl.className = 'event';
-                eventEl.style.top = `${top}%`;
-                eventEl.style.height = `${height}%`;
-                eventEl.style.backgroundColor = event.calendar_color || '#4285f4';
-
-                // Text color based on background brightness
-                const rgb = hexToRgb(event.calendar_color || '#4285f4');
-                const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
-                eventEl.style.color = brightness > 128 ? '#000' : '#fff';
-
-                const timeStr = `${formatTime(startDate)} - ${formatTime(endDate)}`;
-                eventEl.innerHTML = `
-                    <div class="event-title">${escapeHtml(event.title)}</div>
-                    <div class="event-time">${timeStr}</div>
-                    ${event.description ? `<div class="event-description">${escapeHtml(event.description)}</div>` : ''}
-                `;
-
-                grid.appendChild(eventEl);
-            });
-        }
-
-        function updateCurrentTimeLine() {
-            // Remove existing time lines
-            document.querySelectorAll('.current-time-line').forEach(el => el.remove());
-
-            const now = new Date();
-            const currentHour = now.getHours() + now.getMinutes() / 60;
-
-            // Only show if within our time range
-            if (currentHour < START_HOUR || currentHour > END_HOUR) return;
-
-            const todayStr = now.toISOString().split('T')[0];
-            const grid = document.querySelector(`.day-grid[data-date="${todayStr}"]`);
-            if (!grid) return;
-
-            const top = ((currentHour - START_HOUR) / TOTAL_HOURS) * 100;
-
-            const timeLine = document.createElement('div');
-            timeLine.className = 'current-time-line';
-            timeLine.style.top = `${top}%`;
-            timeLine.innerHTML = '<div class="current-time-dot"></div>';
-            grid.appendChild(timeLine);
-        }
-
-        function formatTime(date) {
-            return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-        }
-
-        function hexToRgb(hex) {
-            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-            return result ? {
-                r: parseInt(result[1], 16),
-                g: parseInt(result[2], 16),
-                b: parseInt(result[3], 16)
-            } : { r: 66, g: 133, b: 244 };
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-    </script>
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+function esc(s){ const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+function fmtT(d){ return d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',hour12:false}); }
+function timeAgo(iso){
+    const ms=Date.now()-new Date(iso).getTime(), m=Math.floor(ms/60000);
+    if(m<2) return 'just now';
+    if(m<60) return m+'m ago';
+    const h=Math.floor(m/60);
+    if(h<24) return h+'h ago';
+    return Math.floor(h/24)+'d ago';
+}
+</script>
 </body>
 </html>

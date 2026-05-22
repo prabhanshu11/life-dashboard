@@ -4,3 +4,7 @@
 *.crt
 __pycache__/
 .pi-wifi-creds
+pi/calendar.db
+pi/venv/
+*.db
+*.log
