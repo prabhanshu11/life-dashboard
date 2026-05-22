@@ -166,6 +166,10 @@ Could iframe or API-fetch into dashboard.
 The detection backend runs on **desktop** (CUDA GPU). Dashboard on Pi just displays data
 pulled from the SQLite log. Pi Zero 2W cannot run YOLO inference.
 
+→ See `docs/camera-integration.md` for the full ownership split between this repo
+  and `tapo-c210-monitor` — this dashboard is a read-only consumer of the
+  detection pipeline; do **not** add a second recording/detection feed here.
+
 ---
 
 ## Display Architecture
@@ -198,7 +202,7 @@ pulled from the SQLite log. Pi Zero 2W cannot run YOLO inference.
 | Activity Feed        | ✅ Ready (waiting for pipeline) | Endpoint at /api/activity; reads tapo detection DB when running |
 | Device NOC Strip     | ✅ LIVE                         | Home page strip: Desktop/Laptop/VPS/Camera/Gateway online dots |
 | TV / Content         | ✅ Live                         | Time-of-day schedule: Morning/DeepWork/Afternoon/Evening/Wind-down/Night |
-| Finance              | 🟡 Placeholder                  | UI slot present; needs Gmail OAuth + bank parsers (see Financial Module) |
+| Finance              | ✅ Ready (waiting for sync)     | DB + parsers (HDFC/IOB/HDFC CC/Swiggy/Blinkit) + UI live; needs Gmail auth via /mcp — see `docs/finance-integration.md` |
 | NOC Panel            | 🟢 Separate project             | ~/Programs/pi/noc/ — can iframe or API-fetch when needed |
 
 ## Running Locally

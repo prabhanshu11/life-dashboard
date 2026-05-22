@@ -8,3 +8,5 @@ pi/calendar.db
 pi/venv/
 *.db
 *.log
+finance.db
+finance.db-journal

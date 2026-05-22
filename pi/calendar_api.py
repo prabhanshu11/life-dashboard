@@ -14,6 +14,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import database as db
+import finance_db
+import finance_parsers
+import finance_sync
+
+finance_db.init_db()
 
 # Camera config — updated when camera comes online
 CAMERA_RTSP = os.environ.get(
@@ -314,6 +319,96 @@ async def activity_feed(limit: int = 20) -> dict:
         return {"pipeline_online": True, "events": events}
     except Exception as e:
         return {"pipeline_online": False, "events": [], "error": str(e)}
+
+
+# ── Finance module ───────────────────────────────────────────────────────────
+class TransactionCreate(BaseModel):
+    ts: str
+    amount: float
+    direction: str  # 'credit' | 'debit'
+    account: Optional[str] = None
+    merchant: Optional[str] = None
+    category: Optional[str] = None
+    source: Optional[str] = None
+    email_id: Optional[str] = None
+    raw_snippet: Optional[str] = None
+
+
+class EmailParse(BaseModel):
+    sender: str
+    subject: str = ""
+    body: str = ""
+    email_id: Optional[str] = None
+
+
+class AccountUpsert(BaseModel):
+    name: str
+    type: str = "savings"
+    balance: float
+
+
+@app.get("/api/finance/summary")
+async def finance_summary() -> dict:
+    """Aggregated spend/income/burn-rate figures."""
+    return finance_db.get_summary()
+
+
+@app.get("/api/finance/transactions")
+async def finance_transactions(limit: int = 50, days: Optional[int] = None) -> list:
+    """Recent transactions, newest first."""
+    return finance_db.get_transactions(limit=limit, days=days)
+
+
+@app.post("/api/finance/transaction")
+async def finance_add_transaction(txn: TransactionCreate) -> dict:
+    """Insert a transaction directly (idempotent on email_id)."""
+    return finance_db.add_transaction(
+        ts=txn.ts, amount=txn.amount, direction=txn.direction,
+        account=txn.account, merchant=txn.merchant, category=txn.category,
+        source=txn.source, email_id=txn.email_id, raw_snippet=txn.raw_snippet,
+    )
+
+
+@app.post("/api/finance/parse-email")
+async def finance_parse_email(email: EmailParse) -> dict:
+    """Parse one raw bank/wallet email and store it if it's a transaction.
+
+    Used by the Gmail sync flow — feed it {sender, subject, body, email_id}.
+    """
+    txn = finance_parsers.parse_email(
+        email.sender, email.subject, email.body, email.email_id
+    )
+    if txn is None:
+        return {"status": "not_a_transaction"}
+    result = finance_db.add_transaction(**txn)
+    return {"status": result["status"], "id": result["id"], "parsed": txn}
+
+
+@app.post("/api/finance/account")
+async def finance_upsert_account(acct: AccountUpsert) -> dict:
+    """Set/update a known account balance."""
+    finance_db.upsert_account(acct.name, acct.type, acct.balance)
+    return {"status": "ok"}
+
+
+class GmailBatch(BaseModel):
+    messages: list[dict]  # each: {id, sender|from, subject, body|text|snippet}
+
+
+@app.post("/api/finance/sync")
+async def finance_sync_endpoint(batch: GmailBatch) -> dict:
+    """Ingest a batch of Gmail messages — bank-alert parsing + dedup.
+
+    Intended driver: Claude searches Gmail via the claude.ai Gmail MCP and POSTs
+    matching messages here. See finance_sync.py for the search query.
+    """
+    return finance_sync.sync_messages(batch.messages)
+
+
+@app.get("/api/finance/gmail-query")
+async def finance_gmail_query(days: int = 60) -> dict:
+    """Return the Gmail search query string to use when fetching bank alerts."""
+    return {"query": finance_sync.gmail_search_query(days_back=days), "days_back": days}
 
 
 # Device status — ping known hosts

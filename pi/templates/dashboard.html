@@ -353,8 +353,29 @@ body { display: flex; font-family: 'Space Grotesk', system-ui, sans-serif; backg
 .fin-row-val { color: #ff9900; font-variant-numeric: tabular-nums; }
 .fin-row-val.good { color: #00cc44; }
 .fin-row-val.bad  { color: #cc2200; }
-.fin-setup-msg { color: #3a2000; font-size: 12px; line-height: 1.7; padding: 8px 0; }
+.fin-setup-msg { color: #6a4a10; font-size: 12px; line-height: 1.7; padding: 8px 0; }
 .fin-setup-cmd { color: #cc7700; background: #100800; padding: 10px 14px; border-radius: 4px; border: 1px solid #2a1a00; font-size: 11px; margin-top: 10px; display: block; }
+.fin-body { grid-template-rows: 1fr 1fr; }
+.fin-empty { color: #3a2000; font-size: 11px; padding: 12px 0; font-style: italic; }
+/* transaction feed */
+.fin-txn-list { display: flex; flex-direction: column; gap: 2px; }
+.fin-txn { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #1a0e00; font-size: 12px; }
+.fin-txn-dir { width: 16px; text-align: center; font-size: 13px; flex-shrink: 0; }
+.fin-txn-dir.debit { color: #cc2200; }
+.fin-txn-dir.credit { color: #00cc44; }
+.fin-txn-mid { flex: 1; min-width: 0; }
+.fin-txn-merchant { color: #ff9900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fin-txn-meta { font-size: 9px; color: #5a3a00; margin-top: 1px; }
+.fin-txn-amt { font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.fin-txn-amt.debit { color: #cc4422; }
+.fin-txn-amt.credit { color: #00cc44; }
+/* category bars */
+.fin-cat { margin-bottom: 10px; }
+.fin-cat-top { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 4px; }
+.fin-cat-name { color: #cc7700; text-transform: capitalize; }
+.fin-cat-amt { color: #ff9900; font-variant-numeric: tabular-nums; }
+.fin-cat-bar { height: 6px; background: #1a0e00; border-radius: 3px; overflow: hidden; }
+.fin-cat-bar-fg { height: 100%; background: linear-gradient(90deg, #cc7700, #ff9900); border-radius: 3px; }
 
 /* ══════════════════════════════════════════════════════════════════════════ */
 /* PAGE 7 — CONTENT / TV                                                     */
@@ -525,8 +546,8 @@ body { display: flex; font-family: 'Space Grotesk', system-ui, sans-serif; backg
             <div class="hcard-accent"></div>
             <div class="hcard-icon">₿</div>
             <div class="hcard-label">Finance</div>
-            <div class="hcard-value" style="font-size:16px;color:#5a4a2a">Not linked</div>
-            <div class="hcard-sub">Gmail sync needed</div>
+            <div class="hcard-value" style="font-size:16px;color:#5a4a2a" id="hc-fin-val">Not linked</div>
+            <div class="hcard-sub" id="hc-fin-sub">Gmail sync needed</div>
         </div>
     </div>
 </div>
@@ -662,56 +683,43 @@ body { display: flex; font-family: 'Space Grotesk', system-ui, sans-serif; backg
             <div class="fin-title">FINANCIAL · TERMINAL · v1.0</div>
             <div class="fin-subtitle">THE LEDGER</div>
         </div>
-        <span class="tag tag-amber">GMAIL SYNC PENDING</span>
+        <span class="tag tag-amber" id="finSyncTag">GMAIL SYNC PENDING</span>
     </div>
     <div class="fin-ticker">
-        <div class="fin-ticker-inner" id="finTicker">
-            <span class="fin-t-item up">SAVINGS ▲ —</span>
-            <span class="fin-t-item">·</span>
-            <span class="fin-t-item dn">BURN RATE ▼ —</span>
-            <span class="fin-t-item">·</span>
-            <span class="fin-t-item">HDFC ● not linked</span>
-            <span class="fin-t-item">·</span>
-            <span class="fin-t-item">IOB ● not linked</span>
-            <span class="fin-t-item">·</span>
-            <span class="fin-t-item up">SAVINGS ▲ —</span>
-            <span class="fin-t-item">·</span>
-            <span class="fin-t-item dn">BURN RATE ▼ —</span>
-            <span class="fin-t-item">·</span>
-            <span class="fin-t-item">HDFC ● not linked</span>
-            <span class="fin-t-item">·</span>
-        </div>
+        <div class="fin-ticker-inner" id="finTicker"></div>
     </div>
     <div class="fin-body">
         <div class="fin-panel">
-            <div class="fin-panel-title">Net Savings</div>
-            <div class="fin-big-num">₹ —</div>
-            <div class="fin-big-sub">total accumulated</div>
+            <div class="fin-panel-title">This Month · Net Flow</div>
+            <div class="fin-big-num" id="finNet">₹ —</div>
+            <div class="fin-big-sub">income − spend</div>
             <div style="margin-top:16px">
-                <div class="fin-row"><span class="fin-row-key">HDFC SAVINGS</span><span class="fin-row-val">not linked</span></div>
-                <div class="fin-row"><span class="fin-row-key">IOB SAVINGS</span><span class="fin-row-val">not linked</span></div>
-                <div class="fin-row"><span class="fin-row-key">INVESTMENTS</span><span class="fin-row-val">not linked</span></div>
+                <div class="fin-row"><span class="fin-row-key">INCOME</span><span class="fin-row-val good" id="finIncome">—</span></div>
+                <div class="fin-row"><span class="fin-row-key">SPEND</span><span class="fin-row-val bad" id="finSpend">—</span></div>
+                <div class="fin-row"><span class="fin-row-key">TODAY</span><span class="fin-row-val" id="finToday">—</span></div>
+                <div class="fin-row"><span class="fin-row-key">THIS WEEK</span><span class="fin-row-val" id="finWeek">—</span></div>
             </div>
         </div>
         <div class="fin-panel">
             <div class="fin-panel-title">Burn Rate</div>
-            <div class="fin-big-num">₹ —<span style="font-size:14px;color:#5a3a00">/mo</span></div>
-            <div class="fin-big-sub">monthly spend rate</div>
-            <div style="margin-top:16px">
-                <div class="fin-row"><span class="fin-row-key">HDFC CC 1</span><span class="fin-row-val">not linked</span></div>
-                <div class="fin-row"><span class="fin-row-key">HDFC CC 2</span><span class="fin-row-val">not linked</span></div>
-                <div class="fin-row"><span class="fin-row-key">SWIGGY/BLINKIT</span><span class="fin-row-val">not linked</span></div>
-            </div>
+            <div class="fin-big-num" id="finBurnMo">₹ —<span style="font-size:14px;color:#5a3a00">/mo</span></div>
+            <div class="fin-big-sub" id="finBurnDay">— per day</div>
+            <div class="fin-panel-title" style="margin:18px 0 10px">Accounts</div>
+            <div id="finAccounts"><div class="fin-empty">no accounts tracked</div></div>
         </div>
-        <div class="fin-panel" style="grid-column:span 2">
-            <div class="fin-panel-title">Setup · Connect Gmail</div>
-            <div class="fin-setup-msg">
-                To activate finance tracking, connect your Gmail account. The system will parse HDFC/IOB bank alerts, credit card statements, and delivery receipts (Swiggy, Blinkit) in near real-time.
-                <br><br>
-                <strong style="color:#ff9900">Banks supported:</strong> HDFC, IOB · <strong style="color:#ff9900">Cards:</strong> HDFC CC ×2 · <strong style="color:#ff9900">Apps:</strong> Swiggy, Blinkit
+        <div class="fin-panel">
+            <div class="fin-panel-title">Live Transactions <span id="finTxnCount" style="color:#cc7700"></span></div>
+            <div id="finTxnList" class="fin-txn-list"><div class="fin-empty">no transactions yet</div></div>
+        </div>
+        <div class="fin-panel">
+            <div class="fin-panel-title">Spend by Category · This Month</div>
+            <div id="finCategories"><div class="fin-empty">no spending data</div></div>
+            <div class="fin-panel-title" style="margin:20px 0 8px">Connect Gmail</div>
+            <div class="fin-setup-msg" style="font-size:11px">
+                Run <code style="color:#ff9900">/mcp</code> in Claude Code → authenticate
+                <strong style="color:#ff9900">claude.ai Gmail</strong>, then ask Claude to
+                sync bank alerts. Parses HDFC, IOB, HDFC CC ×2, Swiggy, Blinkit.
             </div>
-            <code class="fin-setup-cmd"># From ~/Programs/life-dashboard — run to configure:<br>
-# Set up Gmail OAuth → see IDEAS.md → Financial Module</code>
         </div>
     </div>
 </div>
@@ -760,6 +768,7 @@ function onPageEnter(id) {
     if (id === 'cam') { checkCamera(); refreshCamFrame(); }
     if (id === 'tv') updateTV();
     if (id === 'habits') loadHabits();
+    if (id === 'fin') loadFinance();
 }
 window.addEventListener('keydown', e => {
     if (e.target.tagName === 'INPUT') return;
@@ -1188,6 +1197,115 @@ function updateTV() {
 }
 setInterval(updateTV, 60000);
 updateTV();
+
+// ─── FINANCE PAGE ─────────────────────────────────────────────────────────────
+function fmtRupee(n) {
+    const v = Math.round(Math.abs(n));
+    return '₹' + v.toLocaleString('en-IN');
+}
+async function loadFinance() {
+    try {
+        const [s, txns] = await Promise.all([
+            fetch('/api/finance/summary').then(r=>r.json()),
+            fetch('/api/finance/transactions?limit=30').then(r=>r.json()),
+        ]);
+        renderFinance(s, txns);
+    } catch(e) {}
+}
+function renderFinance(s, txns) {
+    // Net flow
+    const net = s.net_month;
+    const netEl = document.getElementById('finNet');
+    netEl.textContent = (net>=0?'+':'−') + fmtRupee(net);
+    netEl.style.color = net>=0 ? '#00cc44' : '#cc4422';
+    document.getElementById('finIncome').textContent = fmtRupee(s.income_month);
+    document.getElementById('finSpend').textContent = fmtRupee(s.spend_month);
+    document.getElementById('finToday').textContent = fmtRupee(s.spend_today);
+    document.getElementById('finWeek').textContent = fmtRupee(s.spend_week);
+    // Burn rate
+    document.getElementById('finBurnMo').innerHTML =
+        fmtRupee(s.burn_rate_monthly) + '<span style="font-size:14px;color:#5a3a00">/mo</span>';
+    document.getElementById('finBurnDay').textContent = fmtRupee(s.burn_rate_daily) + ' per day';
+    // Accounts
+    const accEl = document.getElementById('finAccounts');
+    if (s.by_account && s.by_account.length) {
+        accEl.innerHTML = s.by_account.map(a => `
+            <div class="fin-row">
+                <span class="fin-row-key">${esc(a.account||'unknown')}</span>
+                <span class="fin-row-val bad">−${fmtRupee(a.debit)}</span>
+            </div>`).join('');
+    } else {
+        accEl.innerHTML = '<div class="fin-empty">no accounts tracked</div>';
+    }
+    // Transactions
+    const txnEl = document.getElementById('finTxnList');
+    document.getElementById('finTxnCount').textContent = txns.length ? '· '+txns.length : '';
+    if (txns.length) {
+        txnEl.innerHTML = txns.map(t => {
+            const d = t.direction === 'credit';
+            const when = new Date(t.ts).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+            return `<div class="fin-txn">
+                <span class="fin-txn-dir ${t.direction}">${d?'▲':'▼'}</span>
+                <span class="fin-txn-mid">
+                    <div class="fin-txn-merchant">${esc(t.merchant||t.account||t.source||'transaction')}</div>
+                    <div class="fin-txn-meta">${when} · ${esc(t.account||'')} · ${esc(t.category||'')}</div>
+                </span>
+                <span class="fin-txn-amt ${t.direction}">${d?'+':'−'}${fmtRupee(t.amount)}</span>
+            </div>`;
+        }).join('');
+    } else {
+        txnEl.innerHTML = '<div class="fin-empty">no transactions yet — connect Gmail below</div>';
+    }
+    // Categories
+    const catEl = document.getElementById('finCategories');
+    if (s.by_category && s.by_category.length) {
+        const max = Math.max(...s.by_category.map(c=>c.total));
+        catEl.innerHTML = s.by_category.slice(0,6).map(c => `
+            <div class="fin-cat">
+                <div class="fin-cat-top">
+                    <span class="fin-cat-name">${esc(c.category)}</span>
+                    <span class="fin-cat-amt">${fmtRupee(c.total)} · ${c.n}×</span>
+                </div>
+                <div class="fin-cat-bar"><div class="fin-cat-bar-fg" style="width:${(c.total/max*100).toFixed(0)}%"></div></div>
+            </div>`).join('');
+    } else {
+        catEl.innerHTML = '<div class="fin-empty">no spending data</div>';
+    }
+    // Sync tag
+    const tag = document.getElementById('finSyncTag');
+    if (s.total_transactions > 0) {
+        tag.textContent = s.total_transactions + ' TXNS SYNCED';
+        tag.className = 'tag tag-green';
+    } else {
+        tag.textContent = 'GMAIL SYNC PENDING';
+        tag.className = 'tag tag-amber';
+    }
+    // Ticker
+    const ticker = document.getElementById('finTicker');
+    const items = s.total_transactions > 0 ? [
+        `SPEND MTD ▼ ${fmtRupee(s.spend_month)}`,
+        `INCOME MTD ▲ ${fmtRupee(s.income_month)}`,
+        `NET ${net>=0?'▲':'▼'} ${fmtRupee(net)}`,
+        `BURN ${fmtRupee(s.burn_rate_daily)}/day`,
+        `TODAY ▼ ${fmtRupee(s.spend_today)}`,
+        ...(s.by_category||[]).slice(0,3).map(c=>`${c.category.toUpperCase()} ${fmtRupee(c.total)}`),
+    ] : ['GMAIL SYNC PENDING — RUN /mcp TO CONNECT', 'HDFC · IOB · HDFC CC ×2 · SWIGGY · BLINKIT'];
+    const seq = [...items, ...items];
+    ticker.innerHTML = seq.map(t => {
+        const cls = t.includes('▲') ? 'up' : t.includes('▼') ? 'dn' : '';
+        return `<span class="fin-t-item ${cls}">${esc(t)}</span><span class="fin-t-item">·</span>`;
+    }).join('');
+    // Home card
+    const hcFin = document.getElementById('hc-fin-val');
+    if (hcFin) {
+        if (s.total_transactions > 0) {
+            hcFin.textContent = fmtRupee(s.spend_month);
+            hcFin.style.color = '#f39c12';
+            document.getElementById('hc-fin-sub').textContent = 'spent this month';
+        }
+    }
+}
+setInterval(()=>{ if(currentPage==='fin') loadFinance(); }, 60000);
 
 // ─── FULLSCREEN ───────────────────────────────────────────────────────────────
 function toggleFullscreen() {
