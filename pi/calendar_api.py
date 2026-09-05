@@ -30,6 +30,13 @@ CAMERA_RTSP = os.environ.get(
 _frame_cache: tuple[float, bytes] | None = None
 _FRAME_TTL = 5  # seconds
 
+# The camera's own API (star-trek-camera on the desktop). /api/day proxies its
+# GET /timeline, which is the single producer of the day record; this app adds
+# nothing to the evidence, only a short cache and an honest "unreachable".
+CAMERA_API = os.environ.get("CAMERA_API", "http://100.92.71.80:8100").rstrip("/")
+_day_cache: dict[int, tuple[float, dict]] = {}
+_DAY_TTL = 30  # seconds
+
 app = FastAPI(title="Life Dashboard Calendar API")
 
 # Serve templates directory
@@ -102,6 +109,65 @@ async def dashboard():
     if not html_path.exists():
         raise HTTPException(status_code=404, detail="Dashboard not found")
     return html_path.read_text()
+
+
+@app.get("/day", response_class=HTMLResponse)
+async def day_page():
+    """The camera's record of the day: today plus the previous days by hour."""
+    html_path = TEMPLATES_DIR / "day.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="Day page not found")
+    return HTMLResponse(html_path.read_text(),
+                        headers={"Cache-Control": "no-store, must-revalidate"})
+
+
+def _fetch_timeline(hours: int) -> dict:
+    import json as _json
+    import urllib.request
+    req = urllib.request.Request(f"{CAMERA_API}/timeline?hours={hours}",
+                                 headers={"User-Agent": "LifeDashboard/1.0"})
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        return _json.loads(resp.read())
+
+
+@app.get("/api/day")
+async def day_timeline(days: int = Query(4, ge=1, le=31)) -> dict:
+    """Contiguous 1-minute segments for the last `days` local days (today plus
+    days-1 before it), straight from the camera's /timeline. When the camera
+    API cannot be reached the answer says so; it never invents a day."""
+    import asyncio
+    from datetime import datetime as _dt, timedelta as _td
+    now = _dt.now().astimezone()
+    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    span = now - (start_of_today - _td(days=days - 1))
+    hours = int(span.total_seconds() // 3600) + 1
+    cached = _day_cache.get(days)
+    if cached and time.time() - cached[0] < _DAY_TTL:
+        return cached[1]
+    try:
+        data = await asyncio.to_thread(_fetch_timeline, hours)
+    except Exception as e:  # unreachable, 5xx, bad JSON: all are "not known"
+        return {"online": False, "camera_api": CAMERA_API, "error": str(e)[:200],
+                "days": [], "segments": []}
+    data["online"] = True
+    data["camera_api"] = CAMERA_API
+    data["server_now"] = now.isoformat(timespec="seconds")
+    _day_cache[days] = (time.time(), data)
+    return data
+
+
+@app.get("/week", response_class=HTMLResponse)
+async def week_page():
+    """Stub: weekly view of the camera's day record. Not built yet."""
+    return HTMLResponse("<title>Week</title><p style='font:16px system-ui;padding:2rem'>"
+                        "Weekly view is not built yet. See <a href='/day'>/day</a>.</p>")
+
+
+@app.get("/month", response_class=HTMLResponse)
+async def month_page():
+    """Stub: monthly view of the camera's day record. Not built yet."""
+    return HTMLResponse("<title>Month</title><p style='font:16px system-ui;padding:2rem'>"
+                        "Monthly view is not built yet. See <a href='/day'>/day</a>.</p>")
 
 
 # Calendar endpoints

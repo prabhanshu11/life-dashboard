@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day</title>
+<meta name="description" content="The camera's record of the day: where you were, in what posture, and the minutes it did not know.">
+<style>
+/* One theme system, light first. The page is a record, so the palette is
+   paper and ink with one warm accent (desk) and one cool family (rest).
+   Everything the camera did NOT know is drawn as absence of ink. */
+:root {
+  color-scheme: light;
+  --paper: #f9f8f5;
+  --paper-2: #f1efea;
+  --ink: #1c1b18;
+  --ink-2: #5c5a54;
+  --ink-3: #8f8c84;
+  --rule: #dcd9d2;
+  --accent: #b9532a;
+
+  --c-asleep: #33418a;
+  --c-lying: #6b7ad4;
+  --c-mattress: #b8c0ea;
+  --c-desk: #d0663a;
+  --c-treadmill: #1f6b45;
+  --c-moving: #2f8f5b;
+  --c-present: #a9c9b3;
+  --c-away: #e6e3dc;
+  --c-unknown: #d3d0c8;
+  --c-offline: transparent;
+  --now: #1c1b18;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #171716; --paper-2: #1f1f1d; --ink: #ecebe6; --ink-2: #b3b1aa;
+    --ink-3: #7e7c75; --rule: #2e2e2b; --accent: #e0805a;
+    --c-asleep: #5566c4; --c-lying: #8593e6; --c-mattress: #3f4a7d;
+    --c-desk: #d8683f; --c-treadmill: #4fb27c; --c-moving: #3f9d6a;
+    --c-present: #3c5a48; --c-away: #262624; --c-unknown: #333330; --now: #ecebe6;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #171716; --paper-2: #1f1f1d; --ink: #ecebe6; --ink-2: #b3b1aa;
+  --ink-3: #7e7c75; --rule: #2e2e2b; --accent: #e0805a;
+  --c-asleep: #5566c4; --c-lying: #8593e6; --c-mattress: #3f4a7d;
+  --c-desk: #d8683f; --c-treadmill: #4fb27c; --c-moving: #3f9d6a;
+  --c-present: #3c5a48; --c-away: #262624; --c-unknown: #333330; --now: #ecebe6;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--paper); color: var(--ink); }
+body {
+  font-family: "Geist", "Helvetica Neue", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-size: 15px; line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+  padding: 28px clamp(16px, 4vw, 56px) 64px;
+  max-width: 1280px; margin: 0 auto;
+}
+a { color: inherit; }
+h1 { font-size: clamp(30px, 4.5vw, 44px); font-weight: 600; letter-spacing: -0.02em; line-height: 1.05; margin: 0; }
+.muted { color: var(--ink-2); }
+.faint { color: var(--ink-3); }
+
+/* ── header ── */
+header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 32px; margin-bottom: 8px; }
+.now-line { font-size: 17px; margin-top: 8px; }
+.now-line strong { font-weight: 600; }
+.now-line .sw { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; }
+nav { font-size: 14px; color: var(--ink-2); display: flex; gap: 18px; }
+nav span[aria-disabled] { color: var(--ink-3); text-decoration: line-through; text-decoration-color: var(--rule); }
+nav a[aria-current] { color: var(--ink); font-weight: 600; text-decoration: none; }
+
+/* ── the record ── */
+.record { margin-top: 28px; }
+.axis { position: relative; height: 22px; margin-left: var(--gutter); font-size: 12px; color: var(--ink-3); }
+.axis span { position: absolute; transform: translateX(-50%); top: 0; }
+.axis span:first-child { transform: none; }
+.axis span:last-child { transform: translateX(-100%); }
+.axis span.minor { display: none; }
+@media (min-width: 720px) { .axis span.minor { display: block; } }
+
+.day { display: grid; grid-template-columns: var(--gutter) 1fr; align-items: stretch; margin-top: 6px; }
+.day.today { margin-top: 2px; }
+.day-label { font-size: 13px; color: var(--ink-2); padding-right: 12px; align-self: center; line-height: 1.2; }
+.day-label b { display: block; font-weight: 600; color: var(--ink); }
+.day.today .day-label b { font-size: 14px; }
+.band { position: relative; height: var(--h, 30px); background:
+  repeating-linear-gradient(90deg, var(--rule) 0 1px, transparent 1px calc(100% / 24));
+  background-size: calc(100% + 1px) 100%;
+  border-left: 1px solid var(--rule); border-right: 1px solid var(--rule);
+}
+.day.today .band { --h: 76px; }
+@media (max-width: 719px) { .day.today .band { --h: 60px; } .band { --h: 24px; } }
+.seg { position: absolute; top: 0; bottom: 0; cursor: default; transition: opacity .15s; }
+.seg[data-state="asleep"]   { background: var(--c-asleep); }
+.seg[data-state="lying"]    { background: var(--c-lying); }
+.seg[data-state="mattress"] { background: var(--c-mattress); }
+.seg[data-state="desk"]     { background: var(--c-desk); }
+.seg[data-state="treadmill"]{ background: var(--c-treadmill); }
+.seg[data-state="moving"]   { background: var(--c-moving); }
+.seg[data-state="present"]  { background: var(--c-present); }
+.seg[data-state="away"]     { background: var(--c-away); }
+/* Not known: no ink. Unknown = the service was alive but blind (hatched);
+   offline = nothing ran (bare grid). */
+.seg[data-state="unknown"]  { background: repeating-linear-gradient(135deg, var(--c-unknown) 0 2px, transparent 2px 7px); }
+.seg[data-state="offline"]  { background: transparent; }
+.seg.low { opacity: .72; }
+.seg:hover, .seg.active { outline: 2px solid var(--ink); outline-offset: -2px; z-index: 2; }
+body[data-focus] .seg:not([data-state=""]) { opacity: .12; }
+body[data-focus="asleep"] .seg[data-state="asleep"], body[data-focus="lying"] .seg[data-state="lying"],
+body[data-focus="mattress"] .seg[data-state="mattress"], body[data-focus="desk"] .seg[data-state="desk"],
+body[data-focus="treadmill"] .seg[data-state="treadmill"], body[data-focus="moving"] .seg[data-state="moving"],
+body[data-focus="present"] .seg[data-state="present"], body[data-focus="away"] .seg[data-state="away"],
+body[data-focus="notknown"] .seg[data-state="unknown"], body[data-focus="notknown"] .seg[data-state="offline"] { opacity: 1; }
+body[data-focus="notknown"] .seg[data-state="offline"] { background: repeating-linear-gradient(135deg, var(--c-unknown) 0 1px, transparent 1px 9px); }
+.now-mark { position: absolute; top: -6px; bottom: -6px; width: 2px; background: var(--now); transform: translateX(-1px); pointer-events: none; z-index: 3; }
+.now-mark::after { content: attr(data-t); position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.day:not(.today) .now-mark { display: none; }
+.future { position: absolute; top: 0; bottom: 0; right: 0; background: var(--paper); opacity: .55; pointer-events: none; }
+
+/* ── totals (also the legend) ── */
+.totals { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--rule); }
+.tot { display: flex; align-items: baseline; gap: 8px; background: none; border: 0; padding: 4px 0; font: inherit; color: inherit; cursor: pointer; border-radius: 2px; }
+.tot .sw { width: 14px; height: 14px; border-radius: 2px; align-self: center; flex: none; border: 1px solid transparent; }
+.tot .sw.hatch { background: repeating-linear-gradient(135deg, var(--c-unknown) 0 2px, transparent 2px 6px); border-color: var(--rule); }
+.tot .sw.away { border-color: var(--rule); }
+.tot .name { color: var(--ink-2); }
+.tot .val { font-weight: 600; font-size: 17px; }
+.tot[aria-pressed="true"] .name { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.known { margin-top: 10px; color: var(--ink-2); }
+.known b { color: var(--ink); font-weight: 600; }
+
+/* ── today's segments as text: the table view ── */
+.list { margin-top: 36px; }
+.list h2 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+table { border-collapse: collapse; width: 100%; max-width: 760px; font-size: 14px; }
+td { padding: 6px 12px 6px 0; vertical-align: top; border-top: 1px solid var(--rule); }
+tr:first-child td { border-top: 0; }
+td.t { white-space: nowrap; color: var(--ink-2); width: 9.5em; }
+td.d { white-space: nowrap; text-align: right; color: var(--ink-2); width: 5em; padding-right: 0; }
+td .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: -1px; }
+td .ev { color: var(--ink-3); }
+@media (max-width: 719px) { td .ev { display: block; } }
+
+/* ── tooltip ── */
+.tip { position: fixed; z-index: 10; pointer-events: none; background: var(--ink); color: var(--paper); padding: 8px 11px; border-radius: 4px; font-size: 13px; line-height: 1.4; max-width: 300px; box-shadow: 0 4px 16px rgb(28 27 24 / .18); }
+.tip b { font-weight: 600; }
+.tip[hidden] { display: none; }
+@media (max-width: 719px) { .tip { left: 16px !important; right: 16px; bottom: 16px; top: auto !important; max-width: none; } }
+
+.status { margin-top: 28px; padding: 14px 16px; background: var(--paper-2); border-radius: 4px; font-size: 14px; }
+.status[hidden] { display: none; }
+footer { margin-top: 44px; font-size: 13px; color: var(--ink-3); max-width: 70ch; }
+footer p { margin: 6px 0; }
+:root { --gutter: 96px; }
+@media (max-width: 719px) { :root { --gutter: 58px; } }
+@media (prefers-reduced-motion: reduce) { .seg { transition: none; } }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1 id="title">Today</h1>
+    <div class="now-line" id="nowline"><span class="muted">Loading the record…</span></div>
+  </div>
+  <nav>
+    <a href="/">Calendar</a>
+    <a href="/day" aria-current="page">Day</a>
+    <span aria-disabled="true" title="Not built yet">Week</span>
+    <span aria-disabled="true" title="Not built yet">Month</span>
+  </nav>
+</header>
+
+<div class="status" id="status" hidden></div>
+
+<section class="record" aria-label="The last four days by hour">
+  <div class="axis" id="axis"></div>
+  <div id="days"></div>
+</section>
+
+<div class="totals" id="totals" role="group" aria-label="Today's totals; click to highlight a state"></div>
+<div class="known" id="known"></div>
+
+<section class="list">
+  <h2 id="listtitle">Today, as segments</h2>
+  <table id="segtable"><tbody></tbody></table>
+</section>
+
+<footer id="foot"></footer>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+(() => {
+  const STATE_NAME = {
+    asleep: "Asleep", lying: "Lying down", mattress: "On the mattress", desk: "At the desk",
+    treadmill: "Treadmill", moving: "Up and about", present: "Seen, unplaced",
+    away: "Room empty", unknown: "Camera blind", offline: "Camera off",
+  };
+  const ORDER = ["asleep", "lying", "mattress", "desk", "treadmill", "moving", "present", "away", "unknown", "offline"];
+  const POSTURE = { sitting: "sitting", standing: "standing", lying: "lying" };
+  const $ = (s) => document.querySelector(s);
+  const pad = (n) => String(n).padStart(2, "0");
+  const hm = (min) => `${pad(Math.floor(min / 60))}:${pad(min % 60)}`;
+  const dur = (m) => m >= 60 ? `${Math.floor(m / 60)} h ${pad(m % 60)} min` : `${m} min`;
+  const durShort = (m) => m >= 60 ? `${Math.floor(m / 60)}h ${pad(m % 60)}` : `${m} min`;
+
+  // Parse the producer's ISO strings by text so the record keeps the camera's
+  // timezone even when the viewer's clock is elsewhere.
+  const parseIso = (s) => ({ date: s.slice(0, 10), min: +s.slice(11, 13) * 60 + +s.slice(14, 16) });
+  const dayOffset = (date, n) => { const d = new Date(date + "T12:00:00"); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+  const dayName = (date) => new Date(date + "T12:00:00").toLocaleDateString(undefined, { weekday: "long" });
+  const dayLong = (date) => new Date(date + "T12:00:00").toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  const dayShort = (date) => new Date(date + "T12:00:00").toLocaleDateString(undefined, { day: "numeric", month: "short" });
+
+  function describe(seg) {
+    const where = seg.state === "desk" ? "at the desk"
+      : seg.state === "asleep" ? (seg.place === "on_floor" ? "asleep on the floor mattress" : "asleep")
+      : seg.state === "lying" ? (seg.place === "on_floor" ? "lying on the floor" : "lying on the bed")
+      : seg.state === "mattress" ? (seg.place === "on_floor" ? "on the floor mattress" : "on the bed")
+      : seg.state === "treadmill" ? "on the treadmill"
+      : seg.state === "moving" ? (seg.place ? "at the " + seg.place.replace("at_", "").replace("on_", "") : "up and about")
+      : seg.state === "present" ? "seen, place unknown"
+      : seg.state === "away" ? "room looked empty"
+      : seg.state === "unknown" ? "camera did not know"
+      : "camera was off";
+    const posture = (seg.state === "desk" || seg.state === "mattress" || seg.state === "moving") && seg.posture ? ", " + POSTURE[seg.posture] : "";
+    return where + posture;
+  }
+
+  function evidence(seg) {
+    const parts = [dur(seg.minutes)];
+    if (seg.state === "offline") return parts.concat(["no log rows, no scans"]).join(" · ");
+    if (seg.person_frac != null) parts.push(`seen in ${Math.round(seg.person_frac * 100)}% of scans`);
+    parts.push(`${seg.evidence_count} samples`);
+    if (seg.state === "asleep" && seg.motion != null) parts.push(`stillness ${seg.motion.toFixed(3)}`);
+    return parts.join(" · ");
+  }
+
+  // Split segments across local midnights and index them by date.
+  function byDay(segments) {
+    const out = {};
+    for (const s of segments) {
+      let a = parseIso(s.start); const b = parseIso(s.end);
+      while (a.date !== b.date || a.min < b.min) {
+        const endMin = a.date === b.date ? b.min : 1440;
+        if (endMin > a.min) (out[a.date] ||= []).push({ ...s, date: a.date, a: a.min, b: endMin });
+        if (a.date === b.date) break;
+        a = { date: dayOffset(a.date, 1), min: 0 };
+      }
+    }
+    return out;
+  }
+
+  function render(data) {
+    const status = $("#status");
+    if (!data.online) {
+      status.hidden = false;
+      status.textContent = `The camera's API at ${data.camera_api} did not answer (${data.error}). Nothing is known about today until it does.`;
+      $("#nowline").innerHTML = `<span class="muted">No record: camera API unreachable.</span>`;
+      return;
+    }
+    status.hidden = true;
+    const nowIso = data.to;                     // the producer's "now"
+    const now = parseIso(nowIso);
+    const today = now.date;
+    const days = [0, -1, -2, -3].map((n) => dayOffset(today, n));
+    const segs = byDay(data.segments);
+    const totalsByDate = Object.fromEntries((data.days || []).map((d) => [d.date, d.minutes]));
+
+    // Title + now line
+    $("#title").textContent = dayLong(today);
+    document.title = `Day · ${dayShort(today)}`;
+    const cur = (segs[today] || []).find((s) => s.a <= now.min && now.min < s.b) || (segs[today] || []).at(-1);
+    if (cur) {
+      const since = cur.minutes;
+      const sw = `<span class="sw seg" data-state="${cur.state}" style="position:static"></span>`;
+      const verb = cur.gap ? "The camera has not known for" : "Now:";
+      $("#nowline").innerHTML = cur.gap
+        ? `${sw}<strong>${STATE_NAME[cur.state]}</strong> for ${dur(since)} <span class="faint">(${hm(now.min)})</span>`
+        : `${sw}<strong>${describe(cur)}</strong>, for ${dur(since)} <span class="faint">(${hm(now.min)})</span>`;
+    }
+
+    // Axis
+    const axis = $("#axis"); axis.innerHTML = "";
+    for (let h = 0; h <= 24; h += 3) {
+      const el = document.createElement("span");
+      el.style.left = (h / 24 * 100) + "%";
+      el.textContent = h === 24 ? "24" : pad(h);
+      if (h % 6) el.className = "minor";
+      axis.appendChild(el);
+    }
+
+    // Days
+    const wrap = $("#days"); wrap.innerHTML = "";
+    days.forEach((date, i) => {
+      const row = document.createElement("div");
+      row.className = "day" + (i === 0 ? " today" : "");
+      const label = document.createElement("div");
+      label.className = "day-label";
+      label.innerHTML = i === 0 ? `<b>Today</b>${dayShort(date)}` : `<b>${dayName(date).slice(0, 3)}</b>${dayShort(date)}`;
+      const band = document.createElement("div");
+      band.className = "band";
+      band.setAttribute("role", "img");
+      band.setAttribute("aria-label", `${dayLong(date)}: ${summary(totalsByDate[date])}`);
+      for (const s of segs[date] || []) {
+        if (i === 0 && s.a >= now.min) continue;
+        const el = document.createElement("div");
+        el.className = "seg" + (s.confidence < 0.5 && !s.gap ? " low" : "");
+        el.dataset.state = s.state;
+        el.style.left = (s.a / 1440 * 100) + "%";
+        el.style.width = ((Math.min(s.b, i === 0 ? now.min : 1440) - s.a) / 1440 * 100) + "%";
+        el.dataset.tip = JSON.stringify({ h: `${hm(s.a)} - ${hm(s.b)} · ${describe(s)}`, e: evidence(s), c: s.confidence, g: s.gap, l: s.label });
+        band.appendChild(el);
+      }
+      if (i === 0) {
+        const fut = document.createElement("div");
+        fut.className = "future"; fut.style.width = ((1440 - now.min) / 1440 * 100) + "%";
+        band.appendChild(fut);
+        const nm = document.createElement("div");
+        nm.className = "now-mark"; nm.style.left = (now.min / 1440 * 100) + "%"; nm.dataset.t = hm(now.min);
+        band.appendChild(nm);
+      }
+      row.append(label, band);
+      wrap.appendChild(row);
+    });
+
+    // Totals for today (doubles as the legend)
+    const tot = totalsByDate[today] || {};
+    const totals = $("#totals"); totals.innerHTML = "";
+    const known = ORDER.filter((s) => !["unknown", "offline"].includes(s)).reduce((a, s) => a + (tot[s] || 0), 0);
+    const notKnown = (tot.unknown || 0) + (tot.offline || 0);
+    const elapsed = now.min || 1;
+    const items = ORDER.filter((s) => !["unknown", "offline"].includes(s) && tot[s]).map((s) => [s, tot[s]]);
+    if (notKnown) items.push(["notknown", notKnown]);
+    for (const [s, m] of items) {
+      const b = document.createElement("button");
+      b.className = "tot"; b.type = "button"; b.dataset.state = s; b.setAttribute("aria-pressed", "false");
+      const swClass = s === "notknown" ? "sw hatch" : s === "away" ? "sw away seg" : "sw seg";
+      b.innerHTML = `<span class="${swClass}" data-state="${s}" style="position:static"></span><span class="name">${s === "notknown" ? "Not known" : STATE_NAME[s]}</span><span class="val">${durShort(m)}</span>`;
+      b.addEventListener("click", () => {
+        const on = document.body.dataset.focus === s;
+        document.body.toggleAttribute("data-focus", !on);
+        if (!on) document.body.dataset.focus = s; else delete document.body.dataset.focus;
+        totals.querySelectorAll(".tot").forEach((x) => x.setAttribute("aria-pressed", String(!on && x.dataset.state === s)));
+      });
+      totals.appendChild(b);
+    }
+    $("#known").innerHTML = elapsed > 0
+      ? `The camera knew <b>${Math.round(known / elapsed * 100)}%</b> of today so far (${dur(known)} of ${dur(elapsed)}). ${notKnown ? `Not known: ${dur(notKnown)}.` : ""}`
+      : "";
+
+    // Table view of today
+    const tb = $("#segtable tbody"); tb.innerHTML = "";
+    $("#listtitle").textContent = `${dayLong(today)}, as segments of 5 minutes or more`;
+    for (const s of (segs[today] || []).filter((s) => s.b - s.a >= 5 && s.a < now.min)) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td class="t">${hm(s.a)} - ${hm(Math.min(s.b, now.min))}</td>
+        <td><span class="sw seg" data-state="${s.state}" style="position:static"></span>${describe(s)}${s.label ? ` <b>(${s.label})</b>` : ""} <span class="ev">${s.state === "offline" ? "" : (s.person_frac != null ? `seen in ${Math.round(s.person_frac * 100)}% of scans` : "")}${s.confidence < 0.5 && !s.gap ? " · low confidence" : ""}</span></td>
+        <td class="d">${durShort(Math.min(s.b, now.min) - s.a)}</td>`;
+      tb.appendChild(tr);
+    }
+
+    $("#foot").innerHTML = `<p>Derived at 1-minute resolution from ${data.evidence.activity_rows.toLocaleString()} tracker log rows and ${data.evidence.scans.toLocaleString()} YOLO scans (${data.tz}). Asleep = on the mattress, mostly lying, still, for 30 minutes or more. Room empty = the tracker searched for 10 minutes or more and saw a person in under 10% of scans. Hatched = the camera was running but did not know; bare grid = it was not running.</p>
+      <p>Source: <code>${data.camera_api}/timeline</code>, generated ${data.generated_at.slice(11, 16)}. Faded blocks are low-confidence. Labels can be corrected later through <code>POST /timeline/label</code>.</p>`;
+  }
+
+  function summary(tot) {
+    if (!tot) return "no record";
+    return ORDER.filter((s) => tot[s]).map((s) => `${STATE_NAME[s]} ${durShort(tot[s])}`).join(", ");
+  }
+
+  // Tooltip: hover on wide screens, tap on narrow.
+  const tip = $("#tip");
+  let active = null;
+  function showTip(el, x, y) {
+    const d = JSON.parse(el.dataset.tip);
+    tip.innerHTML = `<b>${d.h}</b><br>${d.e}${d.g ? "" : ` · confidence ${Math.round(d.c * 100)}%`}${d.l ? `<br>labelled: ${d.l}` : ""}`;
+    tip.hidden = false;
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    tip.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, x + 14)) + "px";
+    tip.style.top = (y - h - 14 < 8 ? y + 18 : y - h - 14) + "px";
+  }
+  document.addEventListener("pointermove", (e) => {
+    if (e.pointerType !== "mouse") return;
+    const el = e.target.closest?.(".band .seg");
+    if (el) showTip(el, e.clientX, e.clientY); else if (!active) tip.hidden = true;
+  });
+  document.addEventListener("click", (e) => {
+    const el = e.target.closest?.(".band .seg");
+    if (active) active.classList.remove("active");
+    if (el && el !== active) { active = el; el.classList.add("active"); showTip(el, e.clientX, e.clientY); }
+    else { active = null; tip.hidden = true; }
+  });
+
+  async function load() {
+    try {
+      const r = await fetch("/api/day?days=4", { cache: "no-store" });
+      render(await r.json());
+    } catch (e) {
+      const status = $("#status"); status.hidden = false;
+      status.textContent = "Could not load /api/day: " + e;
+    }
+  }
+  load();
+  setInterval(load, 60_000);
+})();
+</script>
+</body>
+</html>

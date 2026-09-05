@@ -24,11 +24,21 @@ Pi Zero 2 W (home WiFi)
 - **autossh**: Maintains persistent SSH tunnel, VPS:8082 -> Pi:8080
 - **VPS nginx**: Reverse proxy with SSL termination
 
+**2026-09-05 - the Pi/VPS route above is DORMANT** (autossh tunnel, life.prabhanshu.space,
+VPS port 8082: the domain returns nothing, port 8082 now belongs to another app, the Pi has
+no copy). **Live host is the desktop**: a systemd USER service `life-dashboard.service` on
+port 8090, reachable over Tailscale/LAN at http://100.92.71.80:8090. It talks to the camera
+producer (star-trek-camera) on the same machine via `CAMERA_API=http://127.0.0.1:8100`.
+Deployed the git way: push to `master`, then run `deploy/desktop/deploy.sh` on the desktop
+(see `deploy/desktop/README.md`).
+
 ## Quick Reference
 
 ### URLs
-- **Production**: https://life.prabhanshu.space
+- **Live (desktop, since 2026-09-05)**: http://100.92.71.80:8090 (Tailscale/LAN)
+- **Dormant (old production)**: https://life.prabhanshu.space (Pi/VPS route, dead)
 - **Local dev**: http://localhost:8080
+- **`/day`**: the camera's record of the day; API `/api/day?days=3` proxies star-trek-camera `GET /timeline`
 
 ### Default Calendars
 - `computer` - Work/tech (default, #4285f4)
@@ -104,7 +114,12 @@ life-dashboard/
 │   ├── requirements.txt         # Python deps
 │   ├── templates/
 │   │   └── dashboard.html       # Vertical monitor view
-│   └── calendar.service         # systemd unit
+│   └── calendar.service         # systemd unit (Pi, dormant)
+├── deploy/
+│   └── desktop/                 # LIVE host: desktop user service, port 8090
+│       ├── life-dashboard.service
+│       ├── deploy.sh            # run on the desktop after git pull
+│       └── README.md
 ├── scripts/
 │   ├── setup-pi.sh              # Pi bootstrap
 │   ├── deploy.sh                # Deploy to Pi

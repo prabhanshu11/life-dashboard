@@ -1,0 +1,27 @@
+# Life Dashboard - DESKTOP host (decision 2026-09-05).
+#
+# The old route (Pi Zero 2W -> autossh tunnel -> VPS nginx -> life.prabhanshu.space)
+# is dormant. The dashboard now runs on the always-on desktop as a systemd USER
+# unit, reachable over Tailscale at http://100.92.71.80:8090 (LAN as well).
+# The camera producer it proxies (star-trek-camera) runs on the same machine,
+# hence CAMERA_API=http://127.0.0.1:8100.
+#
+# Install path: ~/.config/systemd/user/life-dashboard.service (deploy.sh does this).
+# Requires `loginctl enable-linger prabhanshu` once so it runs without a login session.
+
+[Unit]
+Description=Life Dashboard (FastAPI, desktop host, port 8090)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/prabhanshu/Programs/life-dashboard/pi
+Environment=PYTHONUNBUFFERED=1
+Environment=CAMERA_API=http://127.0.0.1:8100
+ExecStart=/usr/bin/uv run --no-project --with fastapi --with "uvicorn[standard]" --with pydantic --with httpx uvicorn calendar_api:app --host 0.0.0.0 --port 8090
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
