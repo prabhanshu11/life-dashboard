@@ -190,6 +190,12 @@ footer p { margin: 6px 0; }
   <table id="segtable"><tbody></tbody></table>
 </section>
 
+<section class="list" id="departures" hidden aria-label="Departures and returns">
+  <h2 id="deptitle">Departures</h2>
+  <p class="faint" id="depnote"></p>
+  <table id="deptable"><thead><tr><th>left</th><th>who</th><th>door</th><th>from</th><th>back</th><th>away</th><th></th></tr></thead><tbody></tbody></table>
+</section>
+
 <footer id="foot"></footer>
 <div class="tip" id="tip" hidden></div>
 
@@ -253,6 +259,51 @@ footer p { margin: 6px 0; }
       }
     }
     return out;
+  }
+
+  // The departure record as a table: one row per absence the camera's ledger
+  // opened (a credible person gone for the flicker debounce) and closed (the
+  // next credible sighting). Numbers are the record's own; "who" is named only
+  // when identity evidence exists; unclean rows (feed gap, restart, identity
+  // mismatch) are shown faded and say why.
+  function renderDepartures(dep, now, today) {
+    const sec = $("#departures");
+    if (!dep || dep.error || !Array.isArray(dep.rows)) { sec.hidden = true; return; }
+    const rows = dep.rows.slice().sort((a, b) => b.t_leave - a.t_leave);
+    const doors = Object.fromEntries((dep.doors || []).map((d) => [d.id, d]));
+    const hmU = (t) => { const d = new Date(t * 1000); return pad(d.getHours()) + ":" + pad(d.getMinutes()); };
+    const dayU = (t) => { const d = new Date(t * 1000); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+    const away = (s) => s == null ? "" : s < 60 ? `${Math.round(s)} s` : s < 3600 ? `${Math.floor(s / 60)} min` : `${Math.floor(s / 3600)} h ${pad(Math.floor((s % 3600) / 60))}`;
+    const who = (w) => !w || !w.n ? "someone" : w.p_him >= 0.5 ? `Prabhanshu (p ${w.p_him.toFixed(2)}, ${w.n})` : `not him (p ${w.p_him.toFixed(2)}, ${w.n})`;
+    const doorTxt = (id) => id == null ? "—" : `${Math.round(doors[id]?.centre_deg ?? 0)}°${doors[id]?.place ? " · " + doors[id].place : ""}`;
+    const UNCLEAN = new Set(["feed_gap", "crosses_restart", "identity_mismatch", "offline"]);
+    const tb = $("#deptable tbody"); tb.innerHTML = "";
+    let shown = 0, clean = 0, longest = null;
+    for (const r of rows) {
+      if (dayU(r.t_leave) !== today) continue;
+      if (shown >= 60) break;
+      const flags = (r.flags || []).filter((f) => UNCLEAN.has(f));
+      const isClean = flags.length === 0;
+      if (isClean) { clean++; if (!r.open && (longest == null || r.duration_s > longest.duration_s)) longest = r; }
+      const tr = document.createElement("tr");
+      if (!isClean) tr.style.opacity = "0.55";
+      const dur = r.open ? `${away(Date.now() / 1000 - r.t_leave)} so far` : away(r.duration_s);
+      tr.innerHTML = `<td class="t">${hmU(r.t_leave)}</td>
+        <td>${who(r.who)}</td>
+        <td>${doorTxt(r.door)}</td>
+        <td>${r.place_at_exit || "—"}</td>
+        <td class="t">${r.open ? "—" : hmU(r.t_return)}${!r.open && r.reentry_door != null && r.reentry_door !== r.door ? ` <span class="faint">via ${Math.round(doors[r.reentry_door]?.centre_deg ?? 0)}°</span>` : ""}</td>
+        <td class="d">${dur}</td>
+        <td class="ev">${flags.join(", ")}</td>`;
+      tb.appendChild(tr);
+      shown++;
+    }
+    sec.hidden = false;
+    $("#deptitle").textContent = `Departures ${dayLong(today)}`;
+    $("#depnote").textContent = shown === 0
+      ? `No absence opened today yet. The record holds ${(dep.rows_clean_total || 0).toLocaleString()} clean absences over ${(dep.doors || []).length} doors (bearing modes, never typed).`
+      : `${shown} absences today (${clean} clean${longest ? `; longest ${away(longest.duration_s)} from ${hmU(longest.t_leave)}` : ""}). ` +
+        `Doors are modes of the exit bearing over ${(dep.rows_clean_total || 0).toLocaleString()} clean rows; a faded row is one the record does not count (its flag says why).`;
   }
 
   function render(data) {
@@ -363,6 +414,11 @@ footer p { margin: 6px 0; }
         <td class="d">${durShort(Math.min(s.b, now.min) - s.a)}</td>`;
       tb.appendChild(tr);
     }
+
+    // Departures and returns (the camera's episodic record, star-trek-camera
+    // /departures; rides on /timeline as `departures`). Absent = the camera
+    // does not carry the record yet; the section stays hidden.
+    renderDepartures(data.departures, now, today);
 
     $("#foot").innerHTML = `<p>Derived at 1-minute resolution from ${data.evidence.activity_rows.toLocaleString()} tracker log rows and ${data.evidence.scans.toLocaleString()} YOLO scans (${data.tz}). Asleep = on the mattress, mostly lying, still, for 30 minutes or more. Room empty = the tracker searched for 10 minutes or more and saw a person in under 10% of scans. Hatched = the camera was running but did not know; bare grid = it was not running.</p>
       <p>Source: <code>${data.camera_api}/timeline</code>, generated ${data.generated_at.slice(11, 16)}. Faded blocks are low-confidence. Labels can be corrected later through <code>POST /timeline/label</code>.</p>`;
