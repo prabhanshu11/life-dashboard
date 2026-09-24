@@ -81,3 +81,43 @@ One header on every page, one token file.
   `Cannot access 'CAL_START' before initialization` (the router runs before
   `CAL_START` is declared). Seen on the live desktop build too.
 - Pomodoro: nothing to link (see audit).
+
+## Fix 21:xx (lane site-shell-fix-0924)
+
+**What his screenshot shows.** It is a ghostty terminal, not the browser. The
+20:59:04 clipboard image (1896×1030, `~/.cache/elephant/clipboardimages/1790263744.png`)
+has the Osaka Jade terminal background `#111c18`, and the yellow bar at the
+bottom left is the ghostty block cursor `#D7C995` (`~/.config/omarchy/current/theme/ghostty.conf`).
+At the same time he was testing Claude Code colour schemes in another session
+(6fbc98dc, 20:53–21:02: "I'm testing color schemes"). At 21:02 he sent that
+session a second screenshot of the same terminal, with the same faint blobs
+and `{ }` ghost, saying "the renderer has gone awry". No combination of stored
+theme × OS scheme × width reproduced an invisible header: the shell's header
+paints its own `background: var(--paper)` and `color: var(--ink)`. Those tokens
+are defined in the light `:root` block and in every dark block, so the header
+text measured ≥ 6.49:1 in all 12 pre-fix combinations of `/` and `/day` at 1896.
+The only real inconsistency was on the dashboard. A stored `light` theme (or a
+light OS) gave it a light paper header over its dark panels, and the toggle
+there did nothing to the panels.
+
+**Fix (in the shell only).**
+- `[data-shell-theme="dark"]` carries the dark token set. `dashboard.html` sets it on
+  `<body class="shell-app">`, so the header on app pages is dark whatever
+  `localStorage["lifeos-theme"]` or `prefers-color-scheme` say. `#theme-toggle` is
+  hidden there, so the toggle only affects `shell-doc` pages and `/day`.
+- `.site-header` keeps explicit `background`/`color` from those tokens. The shell sets
+  no `opacity`, `visibility` or `color` on page content (a test enforces the first two).
+- His readability patch for the dashboard panels is its own commit on top.
+
+**Matrix** (`scripts/shell_matrix.py`, Playwright Chromium, app on :8391):
+7 pages (`/`, `/#time`, `/#cal`, `/#fin`, `/day`, `/week`, `/month`) × stored theme
+{light, dark, unset} × `prefers-color-scheme` {light, dark} × width {1896, 1440, 1024}
+= **126 combinations, 126 pass**. Four checks were run on each:
+1. Header text contrast ≥ 4.5:1 from `getComputedStyle`, measured on 1638 brand, nav and button items. The minimum is 6.49:1, for `/day` "Calendar" with light stored, a dark OS and width 1024.
+2. No visible element in the header or body has opacity < 1.
+3. The toggle is hidden and forced dark is on for `/`; the toggle is shown and forced dark is off for `/day`, `/week` and `/month`.
+4. There are no console errors beyond the known ones.
+
+There are two known errors, and both exist on master without the shell (the
+router runs `goPage(initHash)` before the `const` is declared):
+`/#cal` → `CAL_START` and `/#time` → `BIRTHDATE`, 18 each.
