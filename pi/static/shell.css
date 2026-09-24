@@ -46,11 +46,18 @@
     --ink-3: #7e7c75; --rule: #2e2e2b; --accent: #e0805a;
   }
 }
-:root[data-theme="dark"] {
+:root[data-theme="dark"],
+/* App pages (the dashboard, <body data-shell-theme="dark">) are dark by
+   design: the shell forces its dark tokens there whatever the stored theme or
+   the OS scheme, so the header always matches the panels. Custom properties
+   set on body win over :root for everything inside it. */
+[data-shell-theme="dark"] {
   color-scheme: dark;
   --paper: #171716; --paper-2: #1f1f1d; --ink: #ecebe6; --ink-2: #b3b1aa;
   --ink-3: #7e7c75; --rule: #2e2e2b; --accent: #e0805a;
 }
+/* The theme toggle only means something on document pages. */
+[data-shell-theme="dark"] #theme-toggle { display: none; }
 
 /* ── shared header ──
    Class selectors on purpose: pages keep their own element rules (e.g.
@@ -62,6 +69,8 @@
   min-height: var(--shell-height);
   margin: 0 0 var(--space-5); padding: var(--space-2) 0;
   border-bottom: 1px solid var(--rule);
+  /* Explicit paint from tokens defined for BOTH schemes (light in :root,
+     dark in the blocks above); never left to inheritance or color-scheme. */
   background: var(--paper); color: var(--ink);
   font-family: var(--font-sans); font-size: 14px; line-height: 1.2;
   font-variant-numeric: tabular-nums;
