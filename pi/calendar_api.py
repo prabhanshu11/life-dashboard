@@ -42,33 +42,6 @@ app = FastAPI(title="Life Dashboard Calendar API")
 
 # Serve templates directory
 TEMPLATES_DIR = Path(__file__).parent / "templates"
-STATIC_DIR = Path(__file__).parent / "static"
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-
-def render_page(name: str, *, actions: str = "", values: Optional[dict] = None,
-                headers: Optional[dict] = None) -> HTMLResponse:
-    """Serve a template inside the site shell (docs/site-shell-2026-09-24.md).
-
-    Pages are plain HTML files with two slots: <!--shell:head--> (tokens CSS +
-    saved theme) and <!--shell:header--> (the shared header and nav). No
-    template engine on purpose: the desktop unit runs `uv run --with fastapi
-    ...` without jinja2, and the pages' own JS uses `${...}` freely.
-    `actions` fills the header's per-page button slot; `values` replaces
-    {{key}} placeholders in the page (used by the stub pages only)."""
-    path = TEMPLATES_DIR / name
-    if not path.exists():
-        raise HTTPException(status_code=404, detail=f"{name} not found")
-    css = STATIC_DIR / "shell.css"
-    head = (TEMPLATES_DIR / "_shell_head.html").read_text().replace(
-        "{{shell_version}}", str(int(css.stat().st_mtime)))
-    header = (TEMPLATES_DIR / "_shell_header.html").read_text().replace(
-        "<!--shell:actions-->", actions)
-    html = path.read_text().replace("<!--shell:head-->", head, 1).replace(
-        "<!--shell:header-->", header, 1)
-    for key, val in (values or {}).items():
-        html = html.replace("{{" + key + "}}", val)
-    return HTMLResponse(html, headers=headers)
 
 
 # Pydantic models for request/response
@@ -132,17 +105,21 @@ class LearningCreate(BaseModel):
 # Dashboard endpoint
 @app.get("/", response_class=HTMLResponse)
 async def dashboard():
-    """Serve the calendar dashboard HTML (the seven #hash panels)."""
-    return render_page("dashboard.html", actions=(
-        '<button type="button" class="shell-btn" onclick="toggleFullscreen()" '
-        'title="Full screen (F)">Full screen</button>'))
+    """Serve the calendar dashboard HTML."""
+    html_path = TEMPLATES_DIR / "dashboard.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+    return html_path.read_text()
 
 
 @app.get("/day", response_class=HTMLResponse)
 async def day_page():
     """The camera's record of the day: today plus the previous days by hour."""
-    return render_page("day.html",
-                       headers={"Cache-Control": "no-store, must-revalidate"})
+    html_path = TEMPLATES_DIR / "day.html"
+    if not html_path.exists():
+        raise HTTPException(status_code=404, detail="Day page not found")
+    return HTMLResponse(html_path.read_text(),
+                        headers={"Cache-Control": "no-store, must-revalidate"})
 
 
 def _fetch_timeline(hours: int) -> dict:
@@ -229,13 +206,15 @@ async def day_activity_volume(
 @app.get("/week", response_class=HTMLResponse)
 async def week_page():
     """Stub: weekly view of the camera's day record. Not built yet."""
-    return render_page("stub.html", values={"title": "Week", "title_lower": "weekly"})
+    return HTMLResponse("<title>Week</title><p style='font:16px system-ui;padding:2rem'>"
+                        "Weekly view is not built yet. See <a href='/day'>/day</a>.</p>")
 
 
 @app.get("/month", response_class=HTMLResponse)
 async def month_page():
     """Stub: monthly view of the camera's day record. Not built yet."""
-    return render_page("stub.html", values={"title": "Month", "title_lower": "monthly"})
+    return HTMLResponse("<title>Month</title><p style='font:16px system-ui;padding:2rem'>"
+                        "Monthly view is not built yet. See <a href='/day'>/day</a>.</p>")
 
 
 # Calendar endpoints

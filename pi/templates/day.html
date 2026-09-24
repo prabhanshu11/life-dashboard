@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Day</title>
 <meta name="description" content="The camera's record of the day: where you were, in what posture, and the minutes it did not know.">
-<!--shell:head-->
 <style>
 /* One theme system, light first. The page is a record, so the palette is
    paper and ink with one warm accent (desk) and one cool family (rest).
@@ -58,7 +57,7 @@ body {
   font-size: 15px; line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   font-variant-numeric: tabular-nums;
-  padding: 0 clamp(16px, 4vw, 56px) 64px; /* top: the site shell header */
+  padding: 28px clamp(16px, 4vw, 56px) 64px;
   max-width: 1280px; margin: 0 auto;
 }
 a { color: inherit; }
@@ -219,17 +218,23 @@ footer p { margin: 6px 0; }
 </style>
 </head>
 <body>
-<!-- Site shell header (templates/_shell_header.html): nav, theme, and the
-     camera-site link #camlink. Two sites, hyperlinked (the user, 2026-09-07):
-     this one shows him his life, the camera site (:8100) is for the camera;
-     the script below corrects #camlink from /api/day's camera_api. -->
-<!--shell:header-->
 <header>
   <div>
     <h1 id="title">Today</h1>
     <div class="now-line" id="nowline"><span class="muted">Loading the record…</span></div>
     <div class="now-line her" id="herline" hidden></div>
   </div>
+  <nav>
+    <a href="/">Calendar</a>
+    <a href="/day" aria-current="page">Day</a>
+    <span aria-disabled="true" title="Not built yet">Week</span>
+    <span aria-disabled="true" title="Not built yet">Month</span>
+    <!-- Two sites, hyperlinked (the user, 2026-09-07): this one shows him
+         his life, the camera site (:8100) is for the camera. The href is
+         corrected from /api/day's camera_api once it answers; until then it
+         is this host on the camera's port, which is the desktop's layout. -->
+    <a id="camlink" class="cross" href="#" title="The camera site (star-trek-camera, :8100)">Camera ↗</a>
+  </nav>
 </header>
 
 <div class="status" id="status" hidden></div>
