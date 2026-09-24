@@ -160,6 +160,61 @@ footer p { margin: 6px 0; }
 :root { --gutter: 96px; }
 @media (max-width: 719px) { :root { --gutter: 58px; } }
 @media (prefers-reduced-motion: reduce) { .seg { transition: none; } }
+
+/* ── tracking view: her track, the pies, the table on the right ──
+   Activity colours: dataviz reference categorical slots 1-5, validated on this
+   page's paper (#f9f8f5, light) and (#171716, dark): adjacent CVD dE >= 9.1 /
+   8.4, normal-vision >= 19.6 / 19.3. Slots 3-5 sit under 3:1 on light paper,
+   so every slice is also named in the table beside the pies. Her track takes
+   slot 7 (violet), which no activity uses. */
+:root {
+  --a1: #2a78d6; --a2: #eb6834; --a3: #1baf7a; --a4: #eda100; --a5: #e87ba4;
+  --a-other: #8f8c84; --a-unnamed: #c9c6be; --her: #4a3aa7;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --a1: #3987e5; --a2: #d95926; --a3: #199e70; --a4: #c98500; --a5: #d55181;
+    --a-other: #7e7c75; --a-unnamed: #4a4945; --her: #9085e9;
+  }
+}
+:root[data-theme="dark"] {
+  --a1: #3987e5; --a2: #d95926; --a3: #199e70; --a4: #c98500; --a5: #d55181;
+  --a-other: #7e7c75; --a-unnamed: #4a4945; --her: #9085e9;
+}
+.day.who { margin-top: 3px; }
+.day.who .day-label { font-size: 11px; color: var(--ink-3); }
+.day.who .band { --h: 10px; background: none; border-color: transparent; }
+@media (max-width: 719px) { .day.who .band { --h: 8px; } }
+.run { position: absolute; top: 0; bottom: 0; background: var(--her); }
+.run.likely { background: repeating-linear-gradient(135deg, var(--her) 0 2px, transparent 2px 5px); }
+.now-line.her { font-size: 14px; margin-top: 4px; color: var(--ink-2); }
+.now-line.her .sw { background: var(--her); }
+
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 48px; margin-top: 36px; align-items: start; }
+.split > .list { margin-top: 0; max-height: 720px; overflow: auto; }
+.split > .list table { max-width: none; }
+@media (max-width: 899px) { .split { grid-template-columns: 1fr; } .split > .list { max-height: none; } }
+.pies h2 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+.pies .sleepnote { font-size: 13px; color: var(--ink-2); margin: 0 0 14px; }
+.pies .sleepnote abbr { text-decoration: underline dotted; cursor: help; }
+.pie-pair { display: flex; flex-wrap: wrap; gap: 20px 32px; }
+.pie { flex: 1 1 200px; min-width: 200px; }
+.pie h3 { font-size: 14px; font-weight: 600; margin: 0; }
+.pie .when { font-size: 12px; color: var(--ink-3); margin-bottom: 6px; }
+.pie svg { display: block; width: 100%; max-width: 220px; height: auto; }
+.pie svg path { stroke: var(--paper); stroke-width: 2; cursor: default; }
+.pie svg path:hover { stroke: var(--ink); }
+.pie svg text { fill: var(--ink); font-size: 15px; font-weight: 600; }
+.pie svg text.sub { fill: var(--ink-3); font-size: 11px; font-weight: 400; }
+.pie .n { font-size: 12px; color: var(--ink-2); margin-top: 6px; }
+.vol { margin-top: 16px; font-size: 13px; max-width: none; }
+.vol th { text-align: left; font-weight: 600; color: var(--ink-2); padding: 4px 12px 4px 0; font-size: 12px; }
+.vol th.num, .vol td.num { text-align: right; white-space: nowrap; }
+.vol td { padding: 4px 12px 4px 0; }
+.vol td .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: -1px; }
+.sw.notseen { background: var(--paper-2); border: 1px solid var(--rule); }
+.sw.unid { background: repeating-linear-gradient(135deg, var(--ink-3) 0 2px, transparent 2px 5px); border: 1px solid var(--rule); }
+.vol caption { text-align: left; font-size: 13px; font-weight: 600; padding: 14px 0 4px; }
 </style>
 </head>
 <body>
@@ -167,6 +222,7 @@ footer p { margin: 6px 0; }
   <div>
     <h1 id="title">Today</h1>
     <div class="now-line" id="nowline"><span class="muted">Loading the record…</span></div>
+    <div class="now-line her" id="herline" hidden></div>
   </div>
   <nav>
     <a href="/">Calendar</a>
@@ -191,10 +247,20 @@ footer p { margin: 6px 0; }
 <div class="totals" id="totals" role="group" aria-label="Today's totals; click to highlight a state"></div>
 <div class="known" id="known"></div>
 
+<div class="split">
+<section class="pies" id="pies" aria-label="Activity volume around his last longest sleep window">
+  <h2>What the camera saw him doing, around his last sleep</h2>
+  <p class="sleepnote" id="sleepnote">Loading…</p>
+  <div class="pie-pair" id="piepair"></div>
+  <table class="vol" id="voltable"></table>
+  <table class="vol" id="hertable"></table>
+</section>
+
 <section class="list">
   <h2 id="listtitle">Today, as segments</h2>
   <table id="segtable"><tbody></tbody></table>
 </section>
+</div>
 
 <section class="list" id="departures" hidden aria-label="Departures and returns">
   <h2 id="deptitle">Departures</h2>
@@ -363,6 +429,7 @@ footer p { margin: 6px 0; }
     days.forEach((date, i) => {
       const row = document.createElement("div");
       row.className = "day" + (i === 0 ? " today" : "");
+      row.dataset.date = date;
       const label = document.createElement("div");
       label.className = "day-label";
       label.innerHTML = i === 0 ? `<b>Today</b>${dayShort(date)}` : `<b>${dayName(date).slice(0, 3)}</b>${dayShort(date)}`;
@@ -442,12 +509,171 @@ footer p { margin: 6px 0; }
     return ORDER.filter((s) => tot[s]).map((s) => `${STATE_NAME[s]} ${durShort(tot[s])}`).join(", ");
   }
 
+
+  // ── tracking view (/api/day/activity-volume) ─────────────────────────────
+  // Her track under each day row, her last sighting in the header, and two
+  // pies of HIS minutes per detected activity around his last longest sleep
+  // window. Everything here is text first: the tables carry every number the
+  // pies draw, and without the camera's files the section says so.
+  const esc = (x) => String(x ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const NOT_SEEN = "not seen", UNNAMED = "seen, activity not named", UNID = "a person, not identified";
+  const hmIso = (s) => s.slice(11, 16);
+  const whenIso = (a, b) => {
+    const da = a.slice(0, 10), db = b.slice(0, 10);
+    return da === db ? `${dayShort(da)} ${hmIso(a)} – ${hmIso(b)}` : `${dayShort(da)} ${hmIso(a)} – ${dayShort(db)} ${hmIso(b)}`;
+  };
+  const bandWords = (who, b, p) => p == null ? "identity unscored"
+    : who === "her" ? `p_him ${p.toFixed(2)} (${b === "confident" ? "most likely her" : "maybe her"})`
+    : `p ${p.toFixed(2)} (${b === "confident" ? "most likely him" : "maybe him"})`;
+
+  function renderHerTrack(vol) {
+    document.querySelectorAll(".day.who").forEach((x) => x.remove());
+    if (!vol || !vol.online) return;
+    const segs = byDay(vol.tracks.her.map((r) => ({ ...r, minutes: 0 })));
+    const nowP = parseIso(vol.now);
+    document.querySelectorAll("#days .day[data-date]").forEach((row) => {
+      const date = row.dataset.date;
+      const runs = segs[date];
+      if (!runs && date !== nowP.date) return;
+      const tr = document.createElement("div");
+      tr.className = "day who";
+      tr.innerHTML = `<div class="day-label">Shristy</div>`;
+      const band = document.createElement("div");
+      band.className = "band";
+      band.setAttribute("role", "img");
+      const total = (runs || []).reduce((a, r) => a + (r.b - r.a), 0);
+      band.setAttribute("aria-label", `Shristy, if it was one of the two of you: seen ${dur(total)} on ${dayLong(date)}`);
+      for (const r of runs || []) {
+        const el = document.createElement("div");
+        el.className = "run " + r.band;
+        el.style.left = (r.a / 1440 * 100) + "%";
+        el.style.width = (Math.max(r.b - r.a, 1) / 1440 * 100) + "%";
+        el.dataset.tip = JSON.stringify({ h: `${hm(r.a)} - ${hm(r.b)} · Shristy (if it was one of the two of you): ${r.label}`,
+          e: `${r.place ? r.place + " · " : ""}${bandWords("her", r.band, r.p_him)} · ${r.sightings} sightings`, g: true });
+        band.appendChild(el);
+      }
+      tr.appendChild(band);
+      row.after(tr);
+    });
+  }
+
+  function renderHerLine(vol) {
+    const el = $("#herline");
+    const h = vol && vol.online && vol.last && vol.last.her;
+    if (!h) { el.hidden = true; return; }
+    el.hidden = false;
+    el.innerHTML = `<span class="sw" style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px"></span>` +
+      `Shristy <span class="faint">(if it was one of the two of you)</span>: last seen ${hmIso(h.t)}, ` +
+      `<strong>${esc(h.label || "activity not named")}</strong>${h.place ? " at " + esc(h.place) : ""} ` +
+      `<span class="faint">· ${esc(bandWords("her", h.band, h.p_him))}</span>`;
+  }
+
+  function colourMap(pies) {
+    // Colour follows the activity, fixed for this load: his five biggest
+    // activities across both pies take slots 1-5; the rest share "other".
+    const tot = {};
+    for (const p of pies) for (const s of p.him.slices) {
+      if ([NOT_SEEN, UNNAMED, UNID].includes(s.label)) continue;
+      tot[s.label] = (tot[s.label] || 0) + s.minutes;
+    }
+    const top = Object.entries(tot).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 5).map((x) => x[0]);
+    const map = {};
+    top.forEach((l, i) => (map[l] = { fill: `var(--a${i + 1})`, sw: `background:var(--a${i + 1})` }));
+    return (label) => map[label]
+      || (label === NOT_SEEN ? { fill: "var(--paper-2)", cls: "notseen" }
+      : label === UNNAMED ? { fill: "var(--a-unnamed)", sw: "background:var(--a-unnamed)" }
+      : label === UNID ? { fill: "url(#hatch)", cls: "unid" }
+      : { fill: "var(--a-other)", sw: "background:var(--a-other)", other: true });
+  }
+
+  function sliceOrder(slices, colour) {
+    const rank = (s) => s.label === NOT_SEEN ? 4 : s.label === UNID ? 3 : s.label === UNNAMED ? 2 : colour(s.label).other ? 1 : 0;
+    return slices.slice().sort((a, b) => rank(a) - rank(b) || b.minutes - a.minutes);
+  }
+
+  function donut(pie, colour) {
+    const R = 100, r = 62, C = 110;
+    const total = pie.him.minutes_total || 1;
+    const pt = (rad, ang) => [C + rad * Math.sin(ang), C - rad * Math.cos(ang)];
+    let a0 = 0, paths = "";
+    const slices = sliceOrder(pie.him.slices, colour).filter((s) => s.minutes > 0);
+    for (const s of slices) {
+      const frac = s.minutes / total;
+      const a1 = a0 + frac * 2 * Math.PI;
+      const big = a1 - a0 > Math.PI ? 1 : 0;
+      const e = a1 - a0 >= 2 * Math.PI - 1e-6 ? a1 - 1e-4 : a1;
+      const [x0, y0] = pt(R, a0), [x1, y1] = pt(R, e), [x2, y2] = pt(r, e), [x3, y3] = pt(r, a0);
+      const d = `M${x0},${y0} A${R},${R} 0 ${big} 1 ${x1},${y1} L${x2},${y2} A${r},${r} 0 ${big} 0 ${x3},${y3} Z`;
+      const tipj = esc(JSON.stringify({ h: `${pie.title}: ${s.label}`,
+        e: `${dur(s.minutes)} of ${dur(total)} (${Math.round(frac * 100)}%)`, g: true }));
+      paths += `<path d="${d}" fill="${colour(s.label).fill}" data-tip="${tipj}"><title>${esc(s.label)}: ${s.minutes} min</title></path>`;
+      a0 = a1;
+    }
+    const aria = slices.map((s) => `${s.label} ${s.minutes} min`).join(", ");
+    return `<svg viewBox="0 0 220 220" role="img" aria-label="${esc(pie.title)}: ${esc(aria)}">
+      <defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="6" height="6" fill="var(--paper-2)"/><rect width="2" height="6" fill="var(--ink-3)"/></pattern></defs>
+      ${paths}
+      <text x="${C}" y="${C}" text-anchor="middle">${esc(durShort(pie.him.seen_minutes))}</text>
+      <text class="sub" x="${C}" y="${C + 17}" text-anchor="middle">seen of ${esc(durShort(total))}</text>
+    </svg>`;
+  }
+
+  function volTable(pies, who, colour, caption) {
+    const labels = {};
+    for (const p of pies) for (const s of p[who].slices) labels[s.label] = true;
+    const byPie = pies.map((p) => Object.fromEntries(p[who].slices.map((s) => [s.label, s.minutes])));
+    const rows = sliceOrder(Object.keys(labels).map((l) => ({ label: l, minutes: byPie.reduce((a, m) => a + (m[l] || 0), 0) })), colour);
+    const head = `<tr><th>${who === "her" ? "her activity" : "activity"}</th>${pies.map((p) => `<th class="num">${esc(p.key === "night" ? "night" : "waking")}</th>`).join("")}</tr>`;
+    const body = rows.map((r) => {
+      const c = colour(r.label);
+      const sw = who === "her" ? "" : `<span class="sw ${c.cls || ""}" style="${c.sw || ""}"></span>`;
+      return `<tr><td>${sw}${esc(r.label)}${c.other && who !== "her" ? ` <span class="faint">(other)</span>` : ""}</td>${byPie.map((m) => `<td class="num">${m[r.label] ? durShort(m[r.label]) : "—"}</td>`).join("")}</tr>`;
+    }).join("");
+    return `${caption ? `<caption>${caption}</caption>` : ""}<thead>${head}</thead><tbody>${body}</tbody>`;
+  }
+
+  function renderTracking(vol) {
+    renderHerTrack(vol);
+    renderHerLine(vol);
+    const note = $("#sleepnote"), pair = $("#piepair");
+    if (!vol || !vol.online) {
+      note.textContent = `No activity volumes: the camera's own files could not be read here (${vol && vol.error ? vol.error : "no answer"}). The pies need the dashboard to run on the camera's machine.`;
+      pair.innerHTML = ""; $("#voltable").innerHTML = ""; $("#hertable").innerHTML = "";
+      return;
+    }
+    const s = vol.sleep, rule = esc(vol.rule.text);
+    note.innerHTML = s.found
+      ? `His last longest sleep window: <strong>${whenIso(s.start, s.end)}</strong> (${dur(s.minutes)}${s.open ? ", still open now" : ""}; ` +
+        `seen lying ${s.lying_minutes} min, camera off or silent ${s.unknown_minutes} min inside it). ` +
+        `<abbr title="${rule}" tabindex="0">How the window is found</abbr>. Not bound to calendar days; recomputed on every load.`
+      : `${esc(s.fallback)} <abbr title="${rule}" tabindex="0">How a window would be found</abbr>.`;
+    const colour = colourMap(vol.pies);
+    const titles = { night: "Night and early morning", waking: "Waking hours" };
+    pair.innerHTML = vol.pies.map((p) => {
+      const t = { ...p, title: titles[p.key] || p.title };
+      const n = p.him;
+      const body = p.minutes > 0 ? donut(t, colour) : `<p class="faint">No minutes in this interval yet.</p>`;
+      return `<figure class="pie" style="margin:0">
+        <h3>${esc(t.title)}${!s.found ? ` <span class="faint">(fallback)</span>` : ""}</h3>
+        <div class="when">${whenIso(p.from, p.to)}</div>
+        ${body}
+        <div class="n">n = ${p.minutes.toLocaleString()} min, ${n.sightings.toLocaleString()} sightings of him; seen ${dur(n.seen_minutes)}</div>
+      </figure>`;
+    }).join("");
+    $("#voltable").innerHTML = volTable(vol.pies, "him", colour, "Prabhanshu, minutes per activity (the pies)");
+    const herSeen = vol.pies.reduce((a, p) => a + p.her.seen_minutes, 0);
+    $("#hertable").innerHTML = herSeen
+      ? volTable(vol.pies, "her", colour, "Shristy (if it was one of the two of you), same intervals")
+      : `<caption>Shristy: not seen in either interval.</caption>`;
+  }
+
   // Tooltip: hover on wide screens, tap on narrow.
   const tip = $("#tip");
   let active = null;
   function showTip(el, x, y) {
     const d = JSON.parse(el.dataset.tip);
-    tip.innerHTML = `<b>${d.h}</b><br>${d.e}${d.g ? "" : ` · confidence ${Math.round(d.c * 100)}%`}${d.l ? `<br>labelled: ${d.l}` : ""}`;
+    tip.innerHTML = `<b>${esc(d.h)}</b><br>${esc(d.e)}${d.g ? "" : ` · confidence ${Math.round(d.c * 100)}%`}${d.l ? `<br>labelled: ${esc(d.l)}` : ""}`;
     tip.hidden = false;
     const w = tip.offsetWidth, h = tip.offsetHeight;
     tip.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, x + 14)) + "px";
@@ -455,11 +681,11 @@ footer p { margin: 6px 0; }
   }
   document.addEventListener("pointermove", (e) => {
     if (e.pointerType !== "mouse") return;
-    const el = e.target.closest?.(".band .seg");
+    const el = e.target.closest?.(".band .seg, .band .run, .pie [data-tip]");
     if (el) showTip(el, e.clientX, e.clientY); else if (!active) tip.hidden = true;
   });
   document.addEventListener("click", (e) => {
-    const el = e.target.closest?.(".band .seg");
+    const el = e.target.closest?.(".band .seg, .band .run, .pie [data-tip]");
     if (active) active.classList.remove("active");
     if (el && el !== active) { active = el; el.classList.add("active"); showTip(el, e.clientX, e.clientY); }
     else { active = null; tip.hidden = true; }
@@ -473,6 +699,14 @@ footer p { margin: 6px 0; }
       const status = $("#status"); status.hidden = false;
       status.textContent = "Could not load /api/day: " + e;
     }
+    let vol = null;
+    try {
+      const r = await fetch("/api/day/activity-volume", { cache: "no-store" });
+      vol = await r.json();
+    } catch (e) {
+      vol = { online: false, error: String(e) };
+    }
+    renderTracking(vol);
   }
   load();
   setInterval(load, 60_000);
