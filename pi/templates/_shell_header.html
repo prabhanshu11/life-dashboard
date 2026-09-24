@@ -1,0 +1,58 @@
+<header class="site-header" id="site-header">
+  <a class="site-brand" href="/#home">Life OS</a>
+  <nav class="site-nav" aria-label="Site">
+    <!-- Dashboard panels: one page, switched by #hash (keys 1-7 on the dashboard). -->
+    <a href="/#home" data-section="home">Home</a>
+    <a href="/#time" data-section="time">Time</a>
+    <a href="/#habits" data-section="habits">Habits</a>
+    <a href="/#cal" data-section="cal">Calendar</a>
+    <a href="/#cam" data-section="cam">Eye</a>
+    <a href="/#fin" data-section="fin">Finance</a>
+    <a href="/#tv" data-section="tv">Content</a>
+    <span class="site-sep" aria-hidden="true"></span>
+    <!-- The camera's record: separate pages. -->
+    <a href="/day" data-section="day">Day</a>
+    <a href="/week" data-section="week">Week</a>
+    <a href="/month" data-section="month">Month</a>
+  </nav>
+  <div class="site-tools">
+    <!--shell:actions-->
+    <!-- The camera site (star-trek-camera, :8100 on the same host). Pages may
+         correct the href (/day does, from /api/day's camera_api). -->
+    <a id="camlink" class="shell-btn" href="#" title="The camera site (star-trek-camera, port 8100)">Camera<span class="shell-btn-long">&nbsp;site</span>&nbsp;↗</a>
+    <button type="button" class="shell-btn" id="theme-toggle" aria-label="Colour theme">Auto</button>
+  </div>
+</header>
+<script>
+(() => {
+  const root = document.documentElement;
+  // Current section: path pages by path, the dashboard by its #hash.
+  const mark = () => {
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    const key = path === "/" ? (location.hash.slice(1) || "home") : path.slice(1);
+    document.querySelectorAll(".site-nav a[data-section]").forEach((a) => {
+      if (a.dataset.section === key) a.setAttribute("aria-current", "page");
+      else a.removeAttribute("aria-current");
+    });
+  };
+  mark();
+  window.addEventListener("hashchange", mark);
+
+  const cam = document.getElementById("camlink");
+  if (cam && cam.getAttribute("href") === "#") cam.href = `${location.protocol}//${location.hostname}:8100/`;
+
+  // Theme: Auto (system) -> Light -> Dark -> Auto. Saved per browser.
+  const btn = document.getElementById("theme-toggle");
+  const ORDER = ["auto", "light", "dark"];
+  const LABEL = { auto: "Auto", light: "Light", dark: "Dark" };
+  const current = () => root.dataset.theme || "auto";
+  const show = () => { const t = current(); btn.textContent = LABEL[t]; btn.title = `Theme: ${LABEL[t]} (click to change)`; };
+  btn.addEventListener("click", () => {
+    const next = ORDER[(ORDER.indexOf(current()) + 1) % ORDER.length];
+    if (next === "auto") delete root.dataset.theme; else root.dataset.theme = next;
+    try { localStorage.setItem("lifeos-theme", next); } catch (e) {}
+    show();
+  });
+  show();
+})();
+</script>
