@@ -39,6 +39,7 @@ Deployed the git way: push to `master`, then run `deploy/desktop/deploy.sh` on t
 - **Dormant (old production)**: https://life.prabhanshu.space (Pi/VPS route, dead)
 - **Local dev**: http://localhost:8080
 - **`/day`**: the camera's record of the day; API `/api/day?days=3` proxies star-trek-camera `GET /timeline`
+- **Site shell**: every page gets one header/nav + tokens via `render_page()` (`pi/static/shell.css`, `pi/templates/_shell_*.html`); see `docs/site-shell-2026-09-24.md`. Smoke test: `uv run --no-project --with fastapi --with httpx --with pytest pytest tests/`
 
 ### Default Calendars
 - `computer` - Work/tech (default, #4285f4)
