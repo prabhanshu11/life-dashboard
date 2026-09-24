@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import database as db
+import day_tracking
 import finance_db
 import finance_parsers
 import finance_sync
@@ -153,6 +154,52 @@ async def day_timeline(days: int = Query(4, ge=1, le=31)) -> dict:
     data["camera_api"] = CAMERA_API
     data["server_now"] = now.isoformat(timespec="seconds")
     _day_cache[days] = (time.time(), data)
+    return data
+
+
+_volume_cache: dict[tuple, tuple[float, dict]] = {}
+
+
+@app.get("/api/day/activity-volume")
+async def day_activity_volume(
+    gap_min: int = Query(day_tracking.GAP_MIN, ge=1, le=120),
+    min_sleep_min: int = Query(day_tracking.MIN_SLEEP_MIN, ge=30, le=900),
+    margin_before_min: int = Query(day_tracking.MARGIN_BEFORE_MIN, ge=0, le=240),
+    margin_after_min: int = Query(day_tracking.MARGIN_AFTER_MIN, ge=0, le=240),
+    search_h: int = Query(day_tracking.SEARCH_H, ge=6, le=72),
+    fallback_h: int = Query(day_tracking.FALLBACK_H, ge=1, le=24),
+) -> dict:
+    """Him (person_1) and Shristy (not_person_1, 'Shristy, if it was one of the
+    two of you') minute by minute from the camera's own logs on this machine
+    (STAR_TREK_DATA), his last longest sleep window, and the minutes per
+    detected activity in the two intervals around it. Recomputed on every
+    load (30 s cache). Without the camera's files it says so and invents
+    nothing."""
+    import asyncio
+    key = (gap_min, min_sleep_min, margin_before_min, margin_after_min, search_h, fallback_h)
+    cached = _volume_cache.get(key)
+    if cached and time.time() - cached[0] < _DAY_TTL:
+        return cached[1]
+    data_dir = day_tracking.default_data_dir()
+    log = data_dir / "logs" / "activity.jsonl"
+    if not log.exists():
+        return {"online": False, "error": f"{log} not found on this host", "data_dir": str(data_dir)}
+    lookback_h = max(day_tracking.LOOKBACK_H, search_h + 12)
+
+    def work() -> dict:
+        now = time.time()
+        rec = day_tracking.read_record(data_dir, now - lookback_h * 3600)
+        return day_tracking.compute(
+            rec, now, gap_min=gap_min, min_sleep_min=min_sleep_min,
+            margin_before_min=margin_before_min, margin_after_min=margin_after_min,
+            search_h=search_h, lookback_h=lookback_h, fallback_h=fallback_h)
+
+    try:
+        data = await asyncio.to_thread(work)
+    except Exception as e:  # unreadable file, bad rows: "not known"
+        return {"online": False, "error": str(e)[:200], "data_dir": str(data_dir)}
+    data["data_dir"] = str(data_dir)
+    _volume_cache[key] = (time.time(), data)
     return data
 
 
