@@ -266,7 +266,7 @@ footer p { margin: 6px 0; }
 <section class="list" id="nothing" hidden aria-label="Looking at nothing">
   <h2 id="nothingtitle">Looking at nothing</h2>
   <p class="faint" id="nothingnote"></p>
-  <table id="nothingtable"><thead><tr><th>from</th><th>to</th><th>min</th><th>view</th><th>ended by</th></tr></thead><tbody></tbody></table>
+  <table id="nothingtable"><thead><tr><th>from</th><th>to</th><th>min</th><th>view</th><th>counted by</th><th>ended by</th></tr></thead><tbody></tbody></table>
 </section>
 
 <footer id="foot"></footer>
@@ -702,25 +702,38 @@ footer p { margin: 6px 0; }
     const hm = (s) => (s || "").slice(-5);
     const line = (d, label) => {
       if (!d.report) return `${label}: no report for ${d.day}.`;
+      const t = d.two_signal;
+      const two = t ? `<b>${t.hours} h</b> (n ${t.n}${t.n ? `, longest ${t.longest_min} min` : ""})`
+                    : `not in this report yet`;
       const ends = Object.entries(d.ended_by || {}).map(([k, v]) => `${k} ${v.n}`).join(", ");
-      return `${label}: <b>${d.hours} h</b> looking at nothing in <b>${d.n}</b> stretch${d.n === 1 ? "" : "es"} of ≥ 10 min` +
-        (d.n ? ` (longest ${d.longest_min} min)` : "") + `; ${d.hours_2min} h in ${d.n_2min} of ≥ 2 min. ` +
-        `If a frozen low-confidence box counts as nothing: ${d.frozen_hours} h (n ${d.frozen_n}). ` +
-        `Someone came back into the held view during ${d.someone_home_h} h (n ${d.someone_home_n}).` +
+      return `${label}: looking at nothing, ≥ 10 min — two local person signals ${two} · deployed definition ` +
+        `<b>${d.hours} h</b> (n ${d.n}${d.n ? `, longest ${d.longest_min} min` : ""}). ` +
+        `≥ 2 min: ${d.hours_2min} h (n ${d.n_2min}); frozen-box upper bound ${d.frozen_hours} h (n ${d.frozen_n}); ` +
+        `someone came back into the held view during ${d.someone_home_h} h (n ${d.someone_home_n}).` +
         (ends ? ` Ended by: ${ends}.` : "") + ` <span class="faint">Cycles cover ${d.covered_h} h, to ${hm(d.cycles_last)}.</span>`;
     };
     const [today, ...before] = ln.days;
     $("#nothingtitle").textContent = `Looking at nothing ${dayLong(today.day)}`;
     $("#nothingnote").innerHTML = `<span>${line(today, "Today so far")}</span><br>` +
       before.map((d) => `<span>${line(d, dayLong(d.day))}</span>`).join("<br>") +
-      `<br><span class="faint">${esc(ln.definition)}. An empty view held on a ghost box (e.g. the office chair) counts as ` +
-      `someone, so these hours can be too low; a still sleeper with no box counts as nothing.</span>`;
+      `<br><span>The deployed definition misses time held by ghost boxes (e.g. 09-29 16:53–18:16 empty office chair).</span>` +
+      `<br><span class="faint">Deployed: ${esc(ln.definition)}. Two local signals: a stock box counts as someone only if the ` +
+      `lying model or perception_v2 (him) also fires on ≥ 5 % of the rows within ±30 s. A still sleeper nobody detects ` +
+      `still counts as nothing in both.</span>`;
     const tb = $("#nothingtable tbody"); tb.innerHTML = "";
-    const rows = (today.stretches || []).slice().sort((a, b) => (b.start || 0) - (a.start || 0));
+    const key = (r) => `${r.start_ist}|${r.end_ist}`;
+    const strict = new Set((today.stretches || []).map(key));
+    const rows = (today.two_signal ? today.two_signal.stretches : today.stretches || []).slice();
+    for (const r of (today.stretches || [])) if (today.two_signal && !rows.some((x) => key(x) === key(r))) rows.push(r);
+    rows.sort((a, b) => (b.start || 0) - (a.start || 0));
     for (const r of rows) {
+      const inStrict = strict.has(key(r));
+      const inTwo = !today.two_signal || today.two_signal.stretches.some((x) => key(x) === key(r));
+      const by = today.two_signal ? (inStrict && inTwo ? "both" : inTwo ? "two signals only (a ghost box held it)" : "deployed only") : "deployed";
       const tr = document.createElement("tr");
       tr.innerHTML = `<td class="t">${hm(r.start_ist)}</td><td class="t">${hm(r.end_ist)}</td>
         <td class="d">${r.minutes}</td><td>${esc(r.place || `pan ${r.pan} / tilt ${r.tilt}`)}</td>
+        <td>${esc(by)}</td>
         <td class="ev">${esc(r.ended_by || "")}${r.who_entered ? " · " + esc(r.who_entered) : ""}</td>`;
       tb.appendChild(tr);
     }

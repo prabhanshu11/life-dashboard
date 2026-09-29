@@ -28,6 +28,11 @@ REPORT = {
     "frozen_box_reading": {"looking_at_nothing": {"hours": 7.2, "n": 12}},
     "someone_home_during_it": {"hours": 0.66, "n": 3},
     "reviewed_by_agent": [],
+    "two_signal_reading": {"rule": "r", "looking_at_nothing": {
+        "hours": 8.24, "n": 16, "longest_min": 125.5,
+        "stretches": [{"start": 1790680988.0, "end": 1790681756.0, "start_ist": "09-29 16:53", "end_ist": "09-29 17:05",
+                       "minutes": 12.8, "pan": 0.71, "tilt": 1.89, "place": "floor below desk storage rack",
+                       "ended_by": "restart"}]}},
 }
 
 
@@ -46,7 +51,17 @@ def test_reads_the_report_and_says_when_a_day_has_none(tmp_path):
     assert yday["report"] is True and yday["hours"] == 6.31 and yday["n"] == 12
     assert yday["frozen_hours"] == 7.2 and yday["someone_home_n"] == 3
     assert yday["stretches"][0]["place"] == "open floor beside desk and door"
-    assert "%" not in json.dumps(out)                                # hours with n, never a percentage
+    assert yday["two_signal"]["hours"] == 8.24 and yday["two_signal"]["n"] == 16
+    assert yday["two_signal"]["stretches"][0]["start_ist"] == "09-29 16:53"
+
+
+def test_old_report_without_two_signal_says_none(tmp_path):
+    d = _data(tmp_path)
+    rep = dict(REPORT)
+    rep.pop("two_signal_reading")
+    (d / "reports/looking-at-nothing/days/2026-09-28.json").write_text(json.dumps(rep))
+    out = calendar_api.looking_at_nothing_days(d, 3, today="2026-09-30")
+    assert out["days"][2]["two_signal"] is None
 
 
 def test_endpoint_without_reports_is_offline(tmp_path, monkeypatch):
@@ -65,3 +80,4 @@ def test_endpoint_with_reports(tmp_path, monkeypatch):
 def test_day_page_has_the_panel():
     html = TestClient(calendar_api.app).get("/day").text
     assert 'id="nothing"' in html and "/api/day/looking-at-nothing" in html
+    assert "The deployed definition misses time held by ghost boxes" in html

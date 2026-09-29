@@ -254,6 +254,8 @@ def looking_at_nothing_days(data_dir: Path, days: int, today: Optional[str] = No
         F = (r.get("frozen_box_reading") or {}).get("looking_at_nothing") or {}
         S = r.get("looking_at_nothing_2min") or {}
         H = r.get("someone_home_during_it") or {}
+        T2 = r.get("two_signal_reading")
+        TL = (T2 or {}).get("looking_at_nothing") or {}
         out.append({
             "day": day, "report": True, "created": r.get("created"),
             "cycles_first": (r.get("source") or {}).get("cycles_first"),
@@ -268,6 +270,14 @@ def looking_at_nothing_days(data_dir: Path, days: int, today: Optional[str] = No
                                                     "place", "ended_by", "who_entered")}
                           for s in (L.get("stretches") or [])],
             "reviewed_by_agent": r.get("reviewed_by_agent") or [],
+            # the two-local-signal reading (star-trek-camera nothing-hours-0930): the strict reading misses views held
+            # by a stock ghost box. None = the report predates it (said on the page, never guessed).
+            "two_signal": None if T2 is None else {
+                "hours": TL.get("hours"), "n": TL.get("n"), "longest_min": TL.get("longest_min"),
+                "rule": T2.get("rule"),
+                "stretches": [{k2: s.get(k2) for k2 in ("start", "end", "start_ist", "end_ist", "minutes", "pan",
+                                                        "tilt", "place", "ended_by")}
+                              for s in (TL.get("stretches") or [])]},
         })
     return {"online": True, "data_dir": str(data_dir), "days": out,
             "definition": "head still (readback within 0.004 u) AND no person box on every cycle, for >= 10 min"}
