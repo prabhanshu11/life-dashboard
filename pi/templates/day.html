@@ -263,6 +263,12 @@ footer p { margin: 6px 0; }
   <table id="deptable"><thead><tr><th>left</th><th>who</th><th>door</th><th>from</th><th>back</th><th>away</th><th></th></tr></thead><tbody></tbody></table>
 </section>
 
+<section class="list" id="nothing" hidden aria-label="Looking at nothing">
+  <h2 id="nothingtitle">Looking at nothing</h2>
+  <p class="faint" id="nothingnote"></p>
+  <table id="nothingtable"><thead><tr><th>from</th><th>to</th><th>min</th><th>view</th><th>ended by</th></tr></thead><tbody></tbody></table>
+</section>
+
 <footer id="foot"></footer>
 <div class="tip" id="tip" hidden></div>
 
@@ -686,6 +692,41 @@ footer p { margin: 6px 0; }
     else { active = null; tip.hidden = true; }
   });
 
+  // Looking at nothing (his words 09-24 11:05: "you were able to fool me with statistics … how much time camera
+  // has spent just looking at nothing"): the camera's own daily report files (star-trek-camera
+  // scripts/analysis/looking_at_nothing.py timer), via /api/day/looking-at-nothing. Hours with n, never a %.
+  // Newest first (his 09-07: "the latest items should be on top").
+  function renderNothing(ln) {
+    const sec = $("#nothing");
+    if (!ln || !ln.online || !Array.isArray(ln.days) || !ln.days.length) { sec.hidden = true; return; }
+    const hm = (s) => (s || "").slice(-5);
+    const line = (d, label) => {
+      if (!d.report) return `${label}: no report for ${d.day}.`;
+      const ends = Object.entries(d.ended_by || {}).map(([k, v]) => `${k} ${v.n}`).join(", ");
+      return `${label}: <b>${d.hours} h</b> looking at nothing in <b>${d.n}</b> stretch${d.n === 1 ? "" : "es"} of ≥ 10 min` +
+        (d.n ? ` (longest ${d.longest_min} min)` : "") + `; ${d.hours_2min} h in ${d.n_2min} of ≥ 2 min. ` +
+        `If a frozen low-confidence box counts as nothing: ${d.frozen_hours} h (n ${d.frozen_n}). ` +
+        `Someone came back into the held view during ${d.someone_home_h} h (n ${d.someone_home_n}).` +
+        (ends ? ` Ended by: ${ends}.` : "") + ` <span class="faint">Cycles cover ${d.covered_h} h, to ${hm(d.cycles_last)}.</span>`;
+    };
+    const [today, ...before] = ln.days;
+    $("#nothingtitle").textContent = `Looking at nothing ${dayLong(today.day)}`;
+    $("#nothingnote").innerHTML = `<span>${line(today, "Today so far")}</span><br>` +
+      before.map((d) => `<span>${line(d, dayLong(d.day))}</span>`).join("<br>") +
+      `<br><span class="faint">${esc(ln.definition)}. An empty view held on a ghost box (e.g. the office chair) counts as ` +
+      `someone, so these hours can be too low; a still sleeper with no box counts as nothing.</span>`;
+    const tb = $("#nothingtable tbody"); tb.innerHTML = "";
+    const rows = (today.stretches || []).slice().sort((a, b) => (b.start || 0) - (a.start || 0));
+    for (const r of rows) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td class="t">${hm(r.start_ist)}</td><td class="t">${hm(r.end_ist)}</td>
+        <td class="d">${r.minutes}</td><td>${esc(r.place || `pan ${r.pan} / tilt ${r.tilt}`)}</td>
+        <td class="ev">${esc(r.ended_by || "")}${r.who_entered ? " · " + esc(r.who_entered) : ""}</td>`;
+      tb.appendChild(tr);
+    }
+    sec.hidden = false;
+  }
+
   async function load() {
     try {
       const r = await fetch("/api/day?days=4", { cache: "no-store" });
@@ -702,6 +743,14 @@ footer p { margin: 6px 0; }
       vol = { online: false, error: String(e) };
     }
     renderTracking(vol);
+    let ln = null;
+    try {
+      const r = await fetch("/api/day/looking-at-nothing?days=2", { cache: "no-store" });
+      ln = await r.json();
+    } catch (e) {
+      ln = { online: false, error: String(e) };
+    }
+    renderNothing(ln);
   }
   load();
   setInterval(load, 60_000);

@@ -226,6 +226,62 @@ async def day_activity_volume(
     return data
 
 
+def looking_at_nothing_days(data_dir: Path, days: int, today: Optional[str] = None) -> dict:
+    """The camera's own daily 'looking at nothing' reports, read as files (no camera API, no restart).
+
+    His words (2026-09-24 11:05 IST): "you were able to fool me with statistics … A footage review will reveal that
+    how much time camera has spent just looking at nothing." Producer: star-trek-camera
+    scripts/analysis/looking_at_nothing.py (user timer, every 30 min) -> <data>/reports/looking-at-nothing/days/<day>.json.
+    Definition (docs/reports/looking-at-nothing/README.md there): the head is still AND no person box on any cycle for
+    >= 10 min. Hours with n, never a percentage. Days without a report say so; nothing is invented."""
+    import json as _json
+    from datetime import timedelta as _td
+    base = data_dir / "reports" / "looking-at-nothing" / "days"
+    d0 = datetime.strptime(today, "%Y-%m-%d") if today else datetime.now()
+    out = []
+    for k in range(days):
+        day = (d0 - _td(days=k)).strftime("%Y-%m-%d")
+        p = base / f"{day}.json"
+        if not p.exists():
+            out.append({"day": day, "report": False})
+            continue
+        try:
+            r = _json.loads(p.read_text())
+        except Exception as e:  # half-written or unreadable: not known
+            out.append({"day": day, "report": False, "error": str(e)[:120]})
+            continue
+        L = r.get("looking_at_nothing") or {}
+        F = (r.get("frozen_box_reading") or {}).get("looking_at_nothing") or {}
+        S = r.get("looking_at_nothing_2min") or {}
+        H = r.get("someone_home_during_it") or {}
+        out.append({
+            "day": day, "report": True, "created": r.get("created"),
+            "cycles_first": (r.get("source") or {}).get("cycles_first"),
+            "cycles_last": (r.get("source") or {}).get("cycles_last"),
+            "covered_h": (r.get("source") or {}).get("cycles_covered_h"),
+            "hours": L.get("hours"), "n": L.get("n"), "longest_min": L.get("longest_min"),
+            "ended_by": L.get("ended_by") or {},
+            "hours_2min": S.get("hours"), "n_2min": S.get("n"),
+            "frozen_hours": F.get("hours"), "frozen_n": F.get("n"),
+            "someone_home_h": H.get("hours"), "someone_home_n": H.get("n"),
+            "stretches": [{k2: s.get(k2) for k2 in ("start", "end", "start_ist", "end_ist", "minutes", "pan", "tilt",
+                                                    "place", "ended_by", "who_entered")}
+                          for s in (L.get("stretches") or [])],
+            "reviewed_by_agent": r.get("reviewed_by_agent") or [],
+        })
+    return {"online": True, "data_dir": str(data_dir), "days": out,
+            "definition": "head still (readback within 0.004 u) AND no person box on every cycle, for >= 10 min"}
+
+
+@app.get("/api/day/looking-at-nothing")
+async def day_looking_at_nothing(days: int = Query(2, ge=1, le=14)) -> dict:
+    """Today (so far) and the days before it: hours the head spent looking at nothing, with n stretches."""
+    data_dir = day_tracking.default_data_dir()
+    if not (data_dir / "reports" / "looking-at-nothing").exists():
+        return {"online": False, "error": f"no looking-at-nothing reports under {data_dir}", "days": []}
+    return looking_at_nothing_days(data_dir, days)
+
+
 @app.get("/week", response_class=HTMLResponse)
 async def week_page():
     """Stub: weekly view of the camera's day record. Not built yet."""
