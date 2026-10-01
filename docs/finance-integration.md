@@ -76,14 +76,16 @@ GET /api/finance/wall      (only the wall's fields; fixture: docs/wall-fixtures/
 ```
 
 - Query: `from:(<SENDER_HINTS joined by OR>) newer_than:60d -category:promotions` (logged every run,
-  stored as `query` in the state file). On 2026-10-02 it matched 251 ids, all `alerts@hdfcbank.bank.in`.
+  stored as `query` in the state file). On 2026-10-02 it matched 251 ids, all `alerts@hdfcbank.bank.in`
+  (225 transactions; the 26 others: RM missed calls, e-mandate registrations, declined payments).
 - Incremental: every fetched id goes into `finance.db` table `gmail_seen`, so a run lists all matching
   ids (pages of 50) and only `messages.get`s the unseen ones, inserting each as it is parsed. The state
   file's `cursor {newest_ms, backfill_done}`: the 60-day backfill repeats (cheaply) until one run
   finishes it, then runs list `after:<newest_ms - 1 day>`. `--days N` overrides.
 - Quota (fix 2026-10-02): Gmail charges 5 units per `messages.list` and 5 per `messages.get` (full or
-  metadata: same price, so `format=full`). The project's limit is 6,000 units / user / minute.
-  `finance_gmail.QuotaMeter` paces to `FINANCE_GMAIL_UNITS_PER_MINUTE` (5,000) and stops a run cleanly at
+  metadata: same price, so `format=full`). The console shows 6,000 / user / minute, but live runs were
+  refused at 520 and 580 documented units in a rolling minute (~1/10 of it), so
+  `finance_gmail.QuotaMeter` paces to `FINANCE_GMAIL_UNITS_PER_MINUTE` (500) and stops a run cleanly at
   `FINANCE_GMAIL_UNITS_PER_RUN` (5,000 = ~990 messages); 403 rateLimitExceeded / 429 / 5xx retry after
   5, 10, 20, 40 s (+jitter), max 5 tries. `counts` = {fetched, parsed, inserted, duplicates,
   not_a_transaction, skipped_seen, skipped_units, ids_listed, pages, units, rate_limited, error} is

@@ -11,9 +11,9 @@ Public API:
     get_message(mid, service, meter) -> {id, sender, subject, body, internal_ts, internal_ms}
     fetch_messages(query, max_results=200, service=None) -> list[dict]   (list + get, one shot)
     QuotaMeter: unit accounting. Gmail charges 5 units per messages.list and 5 per
-        messages.get (any format); the per-user limit on the poller's project is
-        6,000 units per rolling minute (Cloud Console, 2026-10-02). The meter paces
-        to FINANCE_GMAIL_UNITS_PER_MINUTE (default 5,000) and stops the run at
+        messages.get (any format). The project's per-user limit reads 6,000 / minute
+        in the Cloud Console but refused at ~550 documented units / minute live, so
+        the meter paces to FINANCE_GMAIL_UNITS_PER_MINUTE (default 500) and stops the run at
         FINANCE_GMAIL_UNITS_PER_RUN (default 5,000) with BudgetExhausted.
     Every call retries 403 rateLimitExceeded / 429 / 5xx with backoff
     5, 10, 20, 40 s (+0-25 % jitter), at most 5 tries.
@@ -52,7 +52,10 @@ class GmailTokenError(RuntimeError):
 # ── quota: units, pacing, budget, backoff ───────────────────────────────────
 UNITS = {"list": 5, "get": 5}  # Gmail API quota units per call (Google's usage-limits table)
 DEFAULT_UNITS_PER_RUN = 5000
-DEFAULT_UNITS_PER_MINUTE = 5000  # project limit is 6,000 / user / minute; keep headroom
+# The console says 6,000 "Total Query Cost" / user / minute, but live runs were refused at
+# 520 and 580 documented units in a rolling minute (2026-10-02 01:21 and 01:31), i.e. ~1/10:
+# the console unit is not the documented unit. Pace at 500 documented units (100 gets) / min.
+DEFAULT_UNITS_PER_MINUTE = 500
 BACKOFF_S = (5, 10, 20, 40)
 MAX_TRIES = 5
 _RATE_REASONS = ("rateLimitExceeded", "userRateLimitExceeded")
