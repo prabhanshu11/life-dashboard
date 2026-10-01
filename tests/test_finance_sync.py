@@ -223,7 +223,7 @@ def test_run_sync_counts_state_and_summary():
     # same-day body date -> time of day from Gmail internalDate
     hdfc = [t for t in finance_db.get_transactions() if t["email_id"] == "m1"][0]
     assert hdfc["ts"].startswith(d(1).isoformat()[:13])
-    assert hdfc["account"] == "HDFC Savings 4321" and hdfc["merchant"].startswith("zomato@")
+    assert hdfc["account"] == "HDFC Savings 4321" and hdfc["merchant"] == "Zomato"  # VPA zomato@hdfcbank, normalised
 
     # IOB alert carried "Avl Bal" -> accounts -> balance walked back over 30 days
     assert s["balance_accounts"][0]["balance"] == pytest.approx(112340.50)

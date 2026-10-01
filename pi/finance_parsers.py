@@ -22,7 +22,7 @@ _AMOUNT = re.compile(
 )
 _CARD_TAIL = re.compile(r"(?:ending|card(?:\s*(?:no|number))?\.?\s*(?:xx+)?)\s*(\d{4})", re.I)
 _ACCT_TAIL = re.compile(r"(?:a/?c|account)\s*(?:no\.?)?\s*(?:x+|\*+)?\s*(\d{3,4})", re.I)
-_VPA = re.compile(r"VPA\s+([\w.\-]+@[\w.\-]+)", re.IGNORECASE)
+_VPA = re.compile(r"VPA\s*:?\s*([\w.\-]+@[\w.\-]+)", re.IGNORECASE)
 _DEBIT_KW = re.compile(r"\b(debited|spent|paid|withdrawn|purchase)\b", re.I)
 _CREDIT_KW = re.compile(r"\b(credited|received|deposited|refund)\b", re.I)
 # "Avl Bal: Rs 12,345.67", "Available Balance is INR 1,234", "Bal Rs.500"
@@ -118,6 +118,82 @@ def infer_category(merchant: str | None, body: str = "") -> str:
     return "uncategorised"
 
 
+# ── merchant normalisation (shared with the orders code: finance_db.BRANDS / _BRAND_BUCKET) ──
+# First match wins, so the narrower names come first (Instamart before Swiggy, Fresh before Amazon).
+# Matched against the raw payee: card "towards X", "Paid to <vpa>", "VPA x@y", "Info: UPI/...".
+MERCHANT_TABLE = [
+    (r"instamart", "Swiggy Instamart", "groceries"),
+    (r"dineout", "Swiggy Dineout", "food"),
+    (r"swiggy|bundl\s*tech", "Swiggy", "food"),
+    (r"blinkit|grofers", "Blinkit", "groceries"),
+    (r"zomato|\beternal\b", "Zomato", "food"),
+    (r"zepto|kiranakart", "Zepto", "groceries"),
+    (r"amazon\s*fresh", "Amazon Fresh", "groceries"),
+    (r"amazon|amzn", "Amazon", "shopping"),
+]
+
+
+def normalise_merchant(raw: str | None) -> tuple[str, str] | None:
+    """(display name, category) for a known brand in a raw payee string, else None."""
+    t = (raw or "").lower()
+    for rx, name, cat in MERCHANT_TABLE:
+        if re.search(rx, t):
+            return name, cat
+    return None
+
+
+# HDFC alert boilerplate starts at these lines; everything after is the same for every mail.
+_BOILERPLATE = re.compile(r"\n\s*(?:Important Note:|Need Help\?|Please call on|Thank you for banking"
+                          r"|Warm Regards)", re.I)
+RAW_BODY_CHARS = 4000
+
+
+def trim_alert(body: str) -> str:
+    """The transaction part of an alert body (boilerplate cut), at most RAW_BODY_CHARS."""
+    m = _BOILERPLATE.search(body or "")
+    return (body[: m.start()] if m else (body or ""))[:RAW_BODY_CHARS]
+
+
+_PAYEE_RX = [
+    # RuPay-UPI card alert (2026-09): "Rs.338.00 has been debited from your RuPay Credit Card (ending 0629)
+    # \nPaid to swiggy1online.gpay@okpayaxis"
+    (r"Paid\s+to\s+(?:VPA\s*:?\s*)?([\w.\-]+@[\w.\-]+)", None),
+    (r"Paid\s+to\s+([A-Za-z][\w .&'*\-]{2,40}?)\s*(?:\n|\.|on\s+\d|$)", None),
+    # savings credit (2026-09): "b. Sender: NAME (VPA: x@okicici)"
+    (r"Sender\s*:\s*([^\n(]{2,40}?)\s*\(\s*VPA\s*:?\s*([\w.\-]+@[\w.\-]+)\s*\)", "name_vpa"),
+    (r"VPA\s*:?\s*([\w.\-]+@[\w.\-]+)", None),
+    (r"\bInfo\s*:\s*(UPI[/\-][^\n]{2,80})", None),
+    (r"\bto\s+(?:a/?c|account)\s+(?:no\.?\s*)?[x*]*(\d{3,6})\b", "account"),
+]
+
+
+def upi_payee(body: str) -> tuple[str | None, str]:
+    """(merchant, hay) for a UPI alert: merchant = known brand name, else the payee name / VPA;
+    hay = the raw payee text to categorise on. (None, '') when no payee line is found."""
+    for rx, kind in _PAYEE_RX:
+        m = re.search(rx, body or "", re.I)
+        if not m:
+            continue
+        if kind == "name_vpa":
+            raw, shown = f"{m.group(1)} {m.group(2)}", m.group(1).strip()
+        elif kind == "account":
+            raw = shown = f"A/c {m.group(1)}"
+        else:
+            raw = shown = m.group(1).strip()
+        known = normalise_merchant(raw)
+        return (known[0] if known else shown), raw
+    return None, ""
+
+
+def merchant_and_category(merchant: str | None, body: str) -> tuple[str | None, str]:
+    """Normalise a parsed merchant; the category comes from the brand table first, then the rules
+    applied to the payee and the transaction part of the body (never the boilerplate)."""
+    known = normalise_merchant(merchant)
+    if known:
+        return known
+    return merchant, infer_category(merchant, trim_alert(body))
+
+
 # ── per-source parsers ───────────────────────────────────────────────────────
 def parse_hdfc(sender: str, subject: str, body: str) -> dict | None:
     """HDFC savings-account UPI / debit / credit alerts."""
@@ -127,18 +203,21 @@ def parse_hdfc(sender: str, subject: str, body: str) -> dict | None:
     direction = _direction(body) or _direction(subject) or "debit"
     vpa = _VPA.search(body)
     acct = _ACCT_TAIL.search(body)
-    merchant = vpa.group(1) if vpa else None
+    merchant, _ = upi_payee(body)
+    if not merchant and vpa:
+        merchant = vpa.group(1)
     if not merchant:
         # "to <NAME>" or "at <MERCHANT>"
         m = re.search(r"\b(?:to|at)\s+([A-Z][\w .&'-]{2,40})", body)
         merchant = m.group(1).strip() if m else None
+    merchant, category = merchant_and_category(merchant, body)
     return {
         "ts": _date(body),
         "amount": amt,
         "direction": direction,
         "account": f"HDFC Savings{(' ' + acct.group(1)) if acct else ''}".strip(),
         "merchant": merchant,
-        "category": infer_category(merchant, body),
+        "category": category,
         "source": "hdfc",
     }
 
@@ -162,6 +241,9 @@ def parse_hdfc_cc(sender: str, subject: str, body: str) -> dict | None:
         if m:
             merchant = m.group(1).strip()
             break
+    if not merchant:
+        merchant, _ = upi_payee(body)  # RuPay-UPI: "Paid to swiggy1online.gpay@okpayaxis"
+    merchant, category = merchant_and_category(merchant, body)
     credit = re.search(r"\b(reversal|refund(?:ed)?|credited to your)\b", f"{subject} {body}", re.I)
     return {
         "ts": _date(body),
@@ -169,7 +251,7 @@ def parse_hdfc_cc(sender: str, subject: str, body: str) -> dict | None:
         "direction": "credit" if credit else "debit",
         "account": f"HDFC CC{(' ' + tail.group(1)) if tail else ''}".strip(),
         "merchant": merchant,
-        "category": "refund" if credit else infer_category(merchant, body),
+        "category": "refund" if credit else category,
         "source": "hdfc_cc",
     }
 
@@ -372,6 +454,46 @@ def parse_blinkit(sender: str, subject: str, body: str) -> dict | None:
                   oid.group(1) if oid else None, amount, status, None, _payment(text))
 
 
+# ── Amazon Pay balance (no-reply@amazonpay.in) ───────────────────────────────
+def parse_amazonpay(sender: str, subject: str, body: str) -> dict | None:
+    """Amazon Pay wallet mails. Live forms (2026-06..09, 25 mails in 120 days):
+    - "Rs 114.00 was paid on Amazon.in" / "Thanks for using Amazon Pay Balance" -> a DEBIT paid from the
+      balance (no order id in the mail): finance_db links it to the Amazon order row of the same amount.
+    - "Amazon has added a Refund Gift Card to your Amazon Pay balance" ... "Received Amount Amazon Pay
+      eGift Card ₹363.00" -> a CREDIT (refund into the balance), linked to the Amazon refund row.
+    - "Your cashback of ₹50.00 is here!" -> a CREDIT into the balance (category cashback).
+    - "Update on refund processed for your order" ("refund of ₹ 654.0 for your order: 408-..., paid via
+      credit card") -> an Amazon order REFUND event (source amazon), deduplicated by ingest_order
+      against the payments-messages@ mail for the same refund.
+    - No-cost-EMI notices and anything else -> None (the card alert already counts that money).
+    Rows keep source 'amazonpay', account 'Amazon Pay', payment 'amazon_pay_balance'."""
+    text = f"{subject} {body}"
+    sub = (subject or "").lower()
+
+    def row(amount, direction, category):
+        return {"ts": _date(body), "amount": amount, "direction": direction, "account": "Amazon Pay",
+                "merchant": "Amazon", "category": category, "source": "amazonpay",
+                "payment": "amazon_pay_balance"}
+
+    if re.search(r"was paid on amazon|thanks for using amazon pay balance", text, re.I):
+        amt = _money(r"^\s*" + _MONEY + r"\s+was paid", subject or "") or _amount(subject) or _amount(body)
+        return row(amt, "debit", "shopping") if amt else None
+    if re.search(r"refund gift card|refund for your amazon\.in order has been applied", text, re.I):
+        amt = _money(r"Received\s+Amount[^\d₹]{0,60}" + _MONEY, body) or _amount(body)
+        return row(amt, "credit", "refund") if amt else None
+    if "cashback" in sub:
+        amt = _amount(subject) or _amount(body)
+        return row(amt, "credit", "cashback") if amt else None
+    oid = _AMZ_ID.search(text)
+    if oid and re.search(r"refund", text, re.I):
+        amt = _money(r"refund of\s*" + _MONEY, text)
+        if amt is None:
+            return None
+        return _order("amazon", "Amazon", "Amazon", "shopping", "refund", oid.group(1), amt, "refunded",
+                      None, _payment(re.sub(r"amazon pay", "", text, flags=re.I)))
+    return None
+
+
 # ── dispatcher ───────────────────────────────────────────────────────────────
 # Match order matters: credit-card before savings (both come from hdfcbank.*).
 _DISPATCH = [
@@ -381,6 +503,7 @@ _DISPATCH = [
     ("swiggy",  lambda s, sub, b: "swiggy" in s),
     ("blinkit", lambda s, sub, b: "blinkit" in s or "grofers" in s),
     ("zomato",  lambda s, sub, b: "zomato" in s and "mailers." not in s),
+    ("amazonpay", lambda s, sub, b: "amazonpay.in" in s),
     ("amazon",  lambda s, sub, b: re.search(r"@amazon\.in\b", s) is not None),
 ]
 _PARSERS = {
@@ -391,6 +514,7 @@ _PARSERS = {
     "blinkit": parse_blinkit,
     "zomato": parse_zomato,
     "amazon": parse_amazon,
+    "amazonpay": parse_amazonpay,
 }
 
 
@@ -413,13 +537,15 @@ def parse_email(
     for key, match in _DISPATCH:
         if match(sender_l, subject, body):
             txn = _PARSERS[key](sender_l, subject, body)
-            if txn and key in ORDER_SOURCES:
+            if txn and txn.get("source") in ORDER_SOURCES:
                 txn["ts"] = received_at or txn["ts"]
                 txn["email_id"] = email_id
                 txn["raw_snippet"] = f"{subject[:120]} — order {txn.get('order_id')}"[:280]
                 return txn
             if txn:
-                if received_at:
+                if received_at and txn.get("source") == "amazonpay":
+                    txn["ts"] = received_at  # its only dates are gift-card expiry dates
+                elif received_at:
                     if not _has_date(body):
                         txn["ts"] = received_at
                     elif txn["ts"][:10] == received_at[:10]:
@@ -429,7 +555,9 @@ def parse_email(
                     if bal is not None:
                         txn["balance_after"] = bal
                 txn["email_id"] = email_id
-                txn["raw_snippet"] = (subject + " — " + body)[:280]
+                # the whole transaction part of the body (the payee line of a RuPay-UPI alert sits
+                # past 280 chars); the shared HDFC boilerplate is cut, see trim_alert
+                txn["raw_snippet"] = (subject + " — " + trim_alert(body))[:RAW_BODY_CHARS]
                 return txn
             return None
     return None
@@ -446,6 +574,8 @@ SENDER_HINTS = [
     "noreply@zomato.com",
     "auto-confirm@amazon.in", "order-update@amazon.in", "shipment-tracking@amazon.in",
     "return@amazon.in", "payments-messages@amazon.in",
+    # Amazon Pay balance: paid-from-balance, refunds into the balance, cashback (lane orders-fix-1002)
+    "no-reply@amazonpay.in",
 ]
 
 

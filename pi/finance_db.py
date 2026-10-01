@@ -110,6 +110,7 @@ def add_transaction(
     email_id: str | None = None,
     raw_snippet: str | None = None,
     balance_after: float | None = None,
+    payment: str | None = None,
 ) -> dict:
     """Insert a transaction. Idempotent on email_id — duplicates are ignored.
 
@@ -125,10 +126,10 @@ def add_transaction(
         cur = conn.execute(
             """INSERT INTO transactions
                (ts, amount, direction, account, merchant, category,
-                source, email_id, raw_snippet)
-               VALUES (?,?,?,?,?,?,?,?,?)""",
+                source, email_id, raw_snippet, payment)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
             (ts, abs(amount), direction, account, merchant, category,
-             source, email_id, raw_snippet),
+             source, email_id, raw_snippet, payment),
         )
         conn.commit()
         return {"status": "added", "id": cur.lastrowid}
@@ -379,7 +380,9 @@ def get_wall(now: datetime | None = None) -> dict:
 # matched_email_id and no order row exists. Not linked (COD, Amazon Pay balance, wallet, a card we
 # do not get alerts for) -> a source='order' row counts it. link_counterpart() is the one function
 # both arrival orders use: after an order row is inserted AND after a bank row is inserted.
-BANK_SOURCES = ("hdfc", "hdfc_cc", "iob", "statement")
+# amazonpay = an Amazon Pay balance mail (paid from balance / refund into balance): the "bank row" of
+# an order paid from the balance, so it links like a card row and the order row folds into it.
+BANK_SOURCES = ("hdfc", "hdfc_cc", "iob", "statement", "amazonpay")
 LINK_AMOUNT_TOL = 1.0
 LINK_DAYS = 2
 NO_BANK_PAYMENTS = ("amazon_pay_balance", "wallet")  # never paid from a bank row: do not link
@@ -400,6 +403,8 @@ def _brand_of(text: str | None) -> str | None:
 def _bank_payment(row: dict) -> str | None:
     if row["source"] == "hdfc_cc":
         return "card"
+    if row["source"] == "amazonpay":
+        return "amazon_pay_balance"
     snip = (row.get("raw_snippet") or "").lower()
     return "upi" if ("upi" in snip or "vpa" in snip) else None
 
@@ -415,17 +420,23 @@ def find_counterpart(conn, row: dict) -> dict | None:
     Window: the bank row lies within LINK_DAYS of the order's mail span (placed .. last
     shipment/delivery mail): Amazon charges the card on dispatch, days after the order."""
     if row["source"] == "order":
-        if row.get("payment") in NO_BANK_PAYMENTS:
+        if row.get("payment") == "amazon_pay_balance":
+            sources = ("amazonpay",)  # paid from the balance: only an Amazon Pay mail is the same money
+        elif row.get("payment") in NO_BANK_PAYMENTS:
             return None
+        else:
+            sources = BANK_SOURCES
         lo, hi = _span(conn, row["id"], row["ts"])
         cands = [dict(r) for r in conn.execute(
-            f"""SELECT * FROM transactions WHERE source IN ({','.join('?' * len(BANK_SOURCES))})
+            f"""SELECT * FROM transactions WHERE source IN ({','.join('?' * len(sources))})
                   AND matched_email_id IS NULL AND direction = ? AND ABS(amount - ?) <= ?
                   AND julianday(ts) BETWEEN julianday(?) - ? AND julianday(?) + ?""",
-            (*BANK_SOURCES, row["direction"], row["amount"], LINK_AMOUNT_TOL, lo, LINK_DAYS, hi, LINK_DAYS),
+            (*sources, row["direction"], row["amount"], LINK_AMOUNT_TOL, lo, LINK_DAYS, hi, LINK_DAYS),
         ).fetchall()]
         mine = _brand_of(row.get("account"))
     elif row["source"] in BANK_SOURCES and not row.get("matched_email_id"):
+        # a balance mail may link a balance-paid order; a bank row never does
+        excluded = ("wallet", "wallet") if row["source"] == "amazonpay" else NO_BANK_PAYMENTS
         cands = [dict(r) for r in conn.execute(
             """SELECT t.* FROM transactions t LEFT JOIN orders o ON o.txn_id = t.id
                WHERE t.source='order' AND COALESCE(t.payment,'') NOT IN (?,?) AND t.direction = ?
@@ -433,7 +444,7 @@ def find_counterpart(conn, row: dict) -> dict | None:
                  AND julianday(?) BETWEEN julianday(MIN(t.ts, COALESCE(o.ts, t.ts))) - ?
                                       AND julianday(MAX(t.ts, COALESCE(o.ts_last, o.ts, t.ts))) + ?
                GROUP BY t.id""",
-            (*NO_BANK_PAYMENTS, row["direction"], row["amount"], LINK_AMOUNT_TOL, row["ts"], LINK_DAYS, LINK_DAYS),
+            (*excluded, row["direction"], row["amount"], LINK_AMOUNT_TOL, row["ts"], LINK_DAYS, LINK_DAYS),
         ).fetchall()]
         mine = _brand_of(f"{row.get('merchant') or ''} {row.get('raw_snippet') or ''}")
     else:
@@ -444,6 +455,10 @@ def find_counterpart(conn, row: dict) -> dict | None:
                            else f"{c.get('merchant') or ''} {c.get('raw_snippet') or ''}")
         if mine and theirs and mine != theirs:
             continue  # an Amazon order never eats a SWIGGY card row of the same amount
+        if "amazonpay" in (row["source"], c["source"]):
+            order_side = row if row["source"] == "order" else c
+            if _brand_of(order_side.get("account")) != "amazon":
+                continue  # Amazon Pay balance money is only ever an Amazon order
         try:
             dt = abs((datetime.fromisoformat(c["ts"][:19]) - datetime.fromisoformat(row["ts"][:19])).total_seconds())
         except ValueError:
@@ -461,11 +476,15 @@ def _merge(conn, order_row: dict, bank_row: dict) -> int:
                payment=?, matched_email_id=? WHERE id=?""",
         (order_row["merchant"] or bank_row["merchant"], order_row.get("items"),
          order_row["category"] or bank_row["category"], order_row.get("order_id"),
-         order_row.get("order_status"), order_row.get("payment") or _bank_payment(bank_row),
+         order_row.get("order_status"),
+         _bank_payment(bank_row) if bank_row["source"] == "amazonpay"
+         else order_row.get("payment") or _bank_payment(bank_row),
          order_row["email_id"], bank_row["id"]))
     conn.execute("DELETE FROM transactions WHERE id=?", (order_row["id"],))
-    conn.execute("UPDATE orders SET txn_id=?, payment=COALESCE(payment, ?), updated_at=datetime('now')"
-                 " WHERE txn_id=?", (bank_row["id"], _bank_payment(bank_row), order_row["id"]))
+    conn.execute("UPDATE orders SET txn_id=?, payment=CASE WHEN ? THEN ? ELSE COALESCE(payment, ?) END,"
+                 " updated_at=datetime('now') WHERE txn_id=?",
+                 (bank_row["id"], bank_row["source"] == "amazonpay", _bank_payment(bank_row),
+                  _bank_payment(bank_row), order_row["id"]))
     return bank_row["id"]
 
 
@@ -662,6 +681,60 @@ def relink_orders() -> int:
     ids = [r[0] for r in conn.execute("SELECT id FROM transactions WHERE source='order'").fetchall()]
     conn.close()
     return sum(link_counterpart(i)["linked"] for i in ids)
+
+
+ALERT_SOURCES = ("hdfc", "hdfc_cc", "iob")
+
+
+def alert_rows_missing_merchant() -> list[dict]:
+    """Alert rows the old 280-char snippet left without a merchant (the --reparse worklist)."""
+    conn = _conn()
+    rows = [dict(r) for r in conn.execute(
+        f"""SELECT id, source, email_id, direction FROM transactions
+            WHERE source IN ({','.join('?' * len(ALERT_SOURCES))}) AND merchant IS NULL
+              AND order_id IS NULL AND email_id IS NOT NULL ORDER BY ts DESC""", ALERT_SOURCES).fetchall()]
+    conn.close()
+    return rows
+
+
+def repair_alert_row(txn_id: int, txn: dict) -> bool:
+    """Write a re-parsed alert (full body) over its row: merchant, category, direction, raw text.
+    ts / amount / account stay. Then try the order link again. True when a merchant was found."""
+    conn = _conn()
+    try:
+        conn.execute("""UPDATE transactions SET merchant=COALESCE(?, merchant), category=?, direction=?,
+                            raw_snippet=? WHERE id=? AND order_id IS NULL""",
+                     (txn.get("merchant"), txn.get("category"), txn["direction"], txn.get("raw_snippet"), txn_id))
+        if txn.get("merchant"):
+            link_counterpart(txn_id, conn)
+        conn.commit()
+    finally:
+        conn.close()
+    return bool(txn.get("merchant"))
+
+
+def normalise_merchants() -> int:
+    """Rename stored brand merchants to the table's names ("SWIGGY PVT LTD E COM1" -> "Swiggy",
+    "AMAZON PAY INDIA" -> "Amazon") and give them the brand category. Order-linked rows keep the
+    order's merchant ("Zomato · <restaurant>"). Returns how many rows changed."""
+    import finance_parsers
+
+    conn = _conn()
+    n = 0
+    try:
+        for r in conn.execute("SELECT id, merchant, category, direction FROM transactions"
+                              " WHERE merchant IS NOT NULL AND order_id IS NULL").fetchall():
+            known = finance_parsers.normalise_merchant(r["merchant"])
+            if not known:
+                continue
+            cat = r["category"] if r["direction"] == "credit" else known[1]
+            if (known[0], cat) != (r["merchant"], r["category"]):
+                conn.execute("UPDATE transactions SET merchant=?, category=? WHERE id=?", (known[0], cat, r["id"]))
+                n += 1
+        conn.commit()
+    finally:
+        conn.close()
+    return n
 
 
 _BRAND_SQL = " OR ".join(f"LOWER(COALESCE(merchant,'')) LIKE '%{w}%'" for ws in BRANDS.values() for w in ws)

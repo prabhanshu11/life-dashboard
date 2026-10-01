@@ -186,8 +186,8 @@ def test_card_repair_and_orders_block():
                                            "Bank Credit Card ending 4089\nFrom Merchant: AMAZON\nDate")
     assert finance_db.repair_card_rows() == 2
     r = {x["email_id"]: x for x in rows()}
-    assert r["old-1"]["merchant"] == "SWIGGY PVT LTD FOOD1"
-    assert r["old-2"]["direction"] == "credit" and r["old-2"]["merchant"] == "AMAZON"
+    assert r["old-1"]["merchant"] == "Swiggy"  # SWIGGY PVT LTD FOOD1, normalised
+    assert r["old-2"]["direction"] == "credit" and r["old-2"]["merchant"] == "Amazon"
     finance_sync.sync_messages([zomato(at(2)), amazon_ordered(at(3)), cc_alert("cc-1", "4303.98", at(3)),
                                 amazon_ordered(at(10), oid="408-5555555-6666666", mid="o-lw", total="999")])
     w = finance_db.get_wall()["orders"]

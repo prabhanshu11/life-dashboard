@@ -171,6 +171,28 @@ before the fix are repaired on every sync (`repair_card_rows`, only rows with no
 linked_to_bank, order_rows}`: rolling 7 days, order-linked rows plus card rows that name a brand (Swiggy,
 Blinkit send no mail), net of refunds. `top_categories_week` picks up the enriched categories.
 
+### UPI payees, merchant names, Amazon Pay balance (lane orders-fix-1002, 2026-10-02)
+- **Full alert text.** `raw_snippet` now keeps the transaction part of an alert body (up to 4,000
+  chars; the shared HDFC boilerplate from "Important Note:" / "Need Help?" on is cut). The old
+  280-char prefix ended before the payee line of the RuPay-UPI card alert.
+- **Payee forms** (`finance_parsers.upi_payee`): "Paid to <vpa>" (RuPay-UPI card), "Sender: NAME
+  (VPA: x@y)" (savings credit), "VPA x@y", "Info: UPI/...", "to account 1049" (self transfer).
+- **Merchant table** `finance_parsers.MERCHANT_TABLE`: Instamart -> "Swiggy Instamart" (groceries),
+  Swiggy/Bundl -> "Swiggy" (food), Blinkit/Grofers -> "Blinkit" (groceries), Zomato/Eternal ->
+  "Zomato", Zepto, Amazon Fresh, AMAZON/AMZN/Amazon Pay -> "Amazon" (shopping). Every sync also
+  renames stored brand merchants (`finance_db.normalise_merchants`, order-linked rows keep theirs),
+  so the `orders` block's `top_merchants_week` shows Swiggy / Blinkit card rows.
+- **Repair once:** `uv run python -m pi.finance_sync --reparse` re-fetches ONLY the alert mails whose
+  rows have no merchant (counted first, 5 units each, capped by the run budget; repeat if capped) and
+  updates them in place. Never inserts.
+- **Amazon Pay** (`no-reply@amazonpay.in`, `parse_amazonpay`): "Rs X was paid on Amazon.in" = a debit
+  from the balance; "Refund Gift Card ... Amazon Pay balance" = a credit; "cashback" = a credit
+  (category cashback); "refund processed for your order <id>" (to a card) = an Amazon refund event
+  (deduplicated with the payments-messages@ mail). Source `amazonpay` is a bank-side source for the
+  link rule: a balance payment and an Amazon order (or refund) of the same amount within 2 days are
+  one row (payment `amazon_pay_balance`), never two; it never pairs with a non-Amazon order.
+  Amazon Pay sends a placeholder text/plain part, so a short plain part loses to the HTML text.
+
 ## Categorisation
 
 Categories are inferred from the merchant string + body text by simple regex

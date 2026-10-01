@@ -172,6 +172,7 @@ def run_sync(days_back: int | None = None, max_results: int | None = None, servi
         # (newest first, as listed: ingest_order is arrival-order independent, see tests)
         todo = [i for i in ids if i not in seen]
         counts["cards_repaired"] = finance_db.repair_card_rows()
+        counts["merchants_normalised"] = finance_db.normalise_merchants()
         counts.update(ids_listed=len(ids), pages=stats.get("pages", 0), skipped_seen=len(seen))
         log.info("finance sync: %d ids matched in %d list pages, %d already seen, %d to fetch "
                  "(~%d units)", len(ids), counts["pages"], len(seen), len(todo),
@@ -237,6 +238,46 @@ def run_sync(days_back: int | None = None, max_results: int | None = None, servi
                      "rate_limited=%(rate_limited)d error=%(error)s", counts)
 
 
+def run_reparse(service=None, meter=None, limit: int | None = None) -> dict:
+    """One-off repair (lane orders-fix-1002): re-fetch ONLY the alert mails whose rows have no
+    merchant (stored when the sync kept a 280-char prefix, before the RuPay-UPI "Paid to <vpa>"
+    line), re-parse the full body, and update those rows in place (merchant, category, direction,
+    raw text); then normalise brand names and retry the order links.
+
+    Counts the worklist first and fetches at most what the run budget allows (5 units per get,
+    paced by QuotaMeter); a capped run is simply repeated. Never inserts a row."""
+    import finance_gmail
+
+    finance_db.init_db()
+    rows = finance_db.alert_rows_missing_merchant()
+    meter = meter or finance_gmail.QuotaMeter()
+    room = max(0, (meter.per_run - meter.spent) // finance_gmail.UNITS["get"])
+    todo = rows[:min(len(rows), room, limit if limit is not None else len(rows))]
+    counts = {"missing_merchant": len(rows), "fetched": 0, "repaired": 0, "still_missing": 0,
+              "unparsed": 0, "left_for_next_run": len(rows) - len(todo), "units": 0}
+    log.info("finance reparse: %d alert rows without a merchant, fetching %d (~%d units, budget %d)",
+             len(rows), len(todo), len(todo) * finance_gmail.UNITS["get"], meter.per_run)
+    try:
+        svc = (service or finance_gmail.build_service()) if todo else None
+        for r in todo:
+            m = finance_gmail.get_message(r["email_id"], svc, meter)
+            counts["fetched"] += 1
+            txn = finance_parsers.parse_email(m["sender"], m["subject"], m["body"], m["id"], m["internal_ts"])
+            if not txn or txn.get("source") != r["source"]:
+                counts["unparsed"] += 1
+                continue
+            if finance_db.repair_alert_row(r["id"], txn):
+                counts["repaired"] += 1
+            else:
+                counts["still_missing"] += 1
+    finally:
+        counts["normalised"] = finance_db.normalise_merchants()
+        counts["relinked"] = finance_db.relink_orders()
+        counts["units"] = meter.spent
+        log.info("finance reparse: %s", " ".join(f"{k}={v}" for k, v in counts.items()))
+    return counts
+
+
 def _parsed(c: dict) -> int:
     return (c["inserted"] + c["duplicates"] + c.get("orders_linked", 0) + c.get("order_updates", 0)
             + c.get("orders_recorded", 0))
@@ -258,6 +299,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--max", type=int, default=None,
                     help="max message ids per run (default: none; the unit budget caps a run)")
     ap.add_argument("--query", action="store_true", help="print the Gmail query and exit")
+    ap.add_argument("--reparse", action="store_true",
+                    help="one-off: re-fetch only the alert mails whose rows lack a merchant and repair them")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     if args.query:
@@ -266,6 +309,9 @@ def main(argv: list[str] | None = None) -> int:
     import finance_gmail
 
     try:
+        if args.reparse:
+            run_reparse(limit=args.max)
+            return 0
         run_sync(args.days, max_results=args.max)
     except finance_gmail.GmailTokenError as e:
         log.warning("finance sync skipped, Gmail not connected: %s", e)

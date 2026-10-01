@@ -223,15 +223,20 @@ def _walk(part: dict, out: dict) -> None:
         _walk(p, out)
 
 
+PLACEHOLDER_PLAIN_CHARS = 120
+
+
 def extract_body(payload: dict) -> str:
     """text/plain part decoded; else text/html stripped to text; else ''."""
     found: dict[str, str] = {}
     _walk(payload or {}, found)
-    if found.get("text/plain", "").strip():
+    plain = found.get("text/plain", "").strip()
+    html_text = html_to_text(found["text/html"]) if "text/html" in found else ""
+    # Amazon Pay sends a placeholder text/plain ("Default email text body", 23 chars) and the real
+    # mail as HTML: a short plain part loses to a longer HTML rendering.
+    if plain and (len(plain) >= PLACEHOLDER_PLAIN_CHARS or len(html_text) <= len(plain)):
         return found["text/plain"]
-    if "text/html" in found:
-        return html_to_text(found["text/html"])
-    return ""
+    return html_text or found.get("text/plain", "")
 
 
 def _header(payload: dict, name: str) -> str:
