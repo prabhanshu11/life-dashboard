@@ -553,6 +553,21 @@ async def finance_summary() -> dict:
     return finance_db.get_summary()
 
 
+@app.get("/api/finance/wall")
+async def finance_wall() -> dict:
+    """Only what the wall's FINANCE slide needs: rolling week vs last week,
+    30-day balance/net-flow series, top categories, last 5, poller state."""
+    w = finance_db.get_wall()
+    s = finance_db.get_summary()
+    return {
+        "generated_at": s["generated_at"],
+        "total_transactions": s["total_transactions"],
+        "burn_rate_daily": s["burn_rate_daily"],
+        "spend_month": s["spend_month"],
+        **w,
+    }
+
+
 @app.get("/api/finance/transactions")
 async def finance_transactions(limit: int = 50, days: Optional[int] = None) -> list:
     """Recent transactions, newest first."""

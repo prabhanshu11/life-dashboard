@@ -25,6 +25,22 @@ the unit file out of the checked-out repo, so it must run from a clone.
 One-time: `loginctl enable-linger prabhanshu` on the desktop so the user service
 runs without a login session (already enabled as of 2026-09-05).
 
+## Finance poller (timer)
+
+`deploy.sh` also runs `uv sync` (project `.venv`) and installs
+`life-finance-sync.service` + `.timer` (every 30 min, 5 min after boot). It
+pulls bank-alert mail with the Gmail API into `pi/finance.db`. Until the
+one-time consent (`uv run scripts/gmail_authorize.py <client.json>`, see
+`docs/finance-integration.md` §B) each run exits 3 and logs "Gmail not
+connected"; that is expected. Check it:
+
+```bash
+ssh desktop 'systemctl --user list-timers | grep finance; cat ~/.local/state/life-dashboard/finance-sync-last.json; journalctl --user -u life-finance-sync -n 20 --no-pager'
+```
+
+The agent rules below allow restarting `life-dashboard` and starting
+`life-finance-sync.service` (its own one-shot).
+
 ## Rules for agents
 
 - `life-dashboard.service` is the dashboard's OWN service and the ONLY unit an

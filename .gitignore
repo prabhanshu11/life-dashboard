@@ -10,3 +10,7 @@ pi/venv/
 *.log
 finance.db
 finance.db-journal
+.venv/
+*.tmp
+gmail-token*.json
+client_secret*.json

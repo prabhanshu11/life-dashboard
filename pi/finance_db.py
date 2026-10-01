@@ -5,11 +5,17 @@ small accounts table for known balances. Kept separate from calendar.db so the
 finance feature can be reasoned about (and reset) independently.
 """
 
+import json
+import os
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "finance.db"
+# Written by `python -m pi.finance_sync` after every run (timer or by hand).
+SYNC_STATE_FILE = Path(
+    os.environ.get("FINANCE_SYNC_STATE_FILE", "~/.local/state/life-dashboard/finance-sync-last.json")
+).expanduser()
 
 
 def _conn() -> sqlite3.Connection:
@@ -63,11 +69,17 @@ def add_transaction(
     source: str | None = None,
     email_id: str | None = None,
     raw_snippet: str | None = None,
+    balance_after: float | None = None,
 ) -> dict:
     """Insert a transaction. Idempotent on email_id — duplicates are ignored.
 
+    `balance_after` (from "Avl Bal" in a bank alert) updates the account's
+    known balance when this transaction is the newest one that reported it.
+
     Returns {"status": "added"|"duplicate", "id": int|None}.
     """
+    if balance_after is not None and account:
+        _record_balance(account, balance_after, ts)
     conn = _conn()
     try:
         cur = conn.execute(
@@ -159,6 +171,7 @@ def get_summary() -> dict:
     accounts = [dict(r) for r in conn.execute("SELECT * FROM accounts").fetchall()]
     conn.close()
     return {
+        **get_wall(now),
         "total_transactions": total_txns,
         "spend_today": round(spend_today, 2),
         "spend_week": round(spend_week, 2),
@@ -171,6 +184,125 @@ def get_summary() -> dict:
         "by_category": by_category,
         "accounts": accounts,
         "generated_at": now.isoformat(),
+    }
+
+
+def _record_balance(account: str, balance: float, ts: str) -> None:
+    """Upsert a balance seen in an alert; never let an older alert overwrite a newer one."""
+    type_ = "credit_card" if " CC" in account else "savings"
+    conn = _conn()
+    conn.execute(
+        """INSERT INTO accounts (name, type, balance, last_updated)
+           VALUES (?,?,?,?)
+           ON CONFLICT(name) DO UPDATE SET
+             balance=excluded.balance, last_updated=excluded.last_updated
+           WHERE accounts.last_updated IS NULL OR excluded.last_updated >= accounts.last_updated""",
+        (account, type_, balance, ts),
+    )
+    conn.commit()
+    conn.close()
+
+
+def read_sync_state() -> dict | None:
+    """The poller's last-run record {ts, counts, error, ...}, or None if it never ran."""
+    try:
+        return json.loads(SYNC_STATE_FILE.read_text())
+    except (OSError, ValueError):
+        return None
+
+
+def _window(conn, since: datetime, until: datetime) -> dict:
+    r = conn.execute(
+        """SELECT COALESCE(SUM(CASE WHEN direction='debit'  THEN amount END),0),
+                  COALESCE(SUM(CASE WHEN direction='credit' THEN amount END),0),
+                  COUNT(*)
+           FROM transactions WHERE ts>=? AND ts<?""",
+        (since.isoformat(), until.isoformat()),
+    ).fetchone()
+    return {
+        "spend": round(float(r[0]), 2), "income": round(float(r[1]), 2), "n": int(r[2]),
+        "from": since.isoformat(timespec="minutes"), "to": until.isoformat(timespec="minutes"),
+    }
+
+
+def get_wall(now: datetime | None = None) -> dict:
+    """Wall-relevant finance fields (also merged into get_summary()).
+
+    week / last_week are ROLLING 7-day windows (the last 168 h vs the 168 h
+    before), so Monday mornings do not read as a 95 % drop.
+    balance_series: one point per day for the last 30 days; `net` is that
+    day's credit - debit, `cum_net` the running sum from day 1, and `balance`
+    (only when the accounts table knows savings balances) is the summed
+    known balance walked back through the later days' net flow.
+    """
+    now = now or datetime.now()
+    conn = _conn()
+    week_start = now - timedelta(days=7)
+    week = _window(conn, week_start, now + timedelta(seconds=1))
+    last_week = _window(conn, week_start - timedelta(days=7), week_start)
+    delta_pct = (
+        round((week["spend"] - last_week["spend"]) / last_week["spend"] * 100, 1)
+        if last_week["spend"] else None
+    )
+
+    top = [
+        dict(r) for r in conn.execute(
+            """SELECT COALESCE(category,'uncategorised') AS category,
+                      ROUND(SUM(amount),2) AS total, COUNT(*) AS n
+               FROM transactions WHERE direction='debit' AND ts>=? AND ts<=?
+               GROUP BY 1 ORDER BY total DESC LIMIT 5""",
+            (week_start.isoformat(), now.isoformat()),
+        ).fetchall()
+    ]
+    for t in top:
+        t["share"] = round(t["total"] / week["spend"], 3) if week["spend"] else None
+
+    day0 = (now - timedelta(days=29)).replace(hour=0, minute=0, second=0, microsecond=0)
+    per_day = {
+        r[0]: float(r[1]) for r in conn.execute(
+            """SELECT substr(ts,1,10),
+                      SUM(CASE WHEN direction='credit' THEN amount ELSE -amount END)
+               FROM transactions WHERE ts>=? GROUP BY 1""",
+            (day0.isoformat(),),
+        ).fetchall()
+    }
+    known = [
+        dict(r) for r in conn.execute(
+            "SELECT name, type, balance, last_updated FROM accounts WHERE balance IS NOT NULL"
+        ).fetchall()
+    ]
+    savings_now = sum(a["balance"] for a in known if a["type"] != "credit_card") if known else None
+    series, cum = [], 0.0
+    days = [(day0 + timedelta(days=i)).date().isoformat() for i in range(30)]
+    for d in days:
+        cum += per_day.get(d, 0.0)
+        series.append({"date": d, "net": round(per_day.get(d, 0.0), 2), "cum_net": round(cum, 2)})
+    if savings_now is not None:
+        bal = savings_now
+        for pt in reversed(series):
+            pt["balance"] = round(bal, 2)
+            bal -= pt["net"]
+
+    recent = [
+        dict(r) for r in conn.execute(
+            """SELECT ts, amount, direction, account, merchant, category
+               FROM transactions ORDER BY ts DESC LIMIT 5"""
+        ).fetchall()
+    ]
+    newest = conn.execute("SELECT MAX(ts), MAX(created_at) FROM transactions").fetchone()
+    conn.close()
+    return {
+        "week": week,
+        "last_week": last_week,
+        "delta_pct": delta_pct,
+        "balance_series": series,
+        "balance_accounts": known,
+        "top_categories_week": top,
+        "recent": recent,
+        "last_sync": read_sync_state(),
+        "new_since": newest[0],
+        # sqlite datetime('now') is UTC
+        "last_inserted_at": (newest[1].replace(" ", "T") + "Z") if newest[1] else None,
     }
 
 

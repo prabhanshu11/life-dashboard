@@ -25,6 +25,12 @@ _ACCT_TAIL = re.compile(r"(?:a/?c|account)\s*(?:no\.?)?\s*(?:x+|\*+)?\s*(\d{3,4}
 _VPA = re.compile(r"VPA\s+([\w.\-]+@[\w.\-]+)", re.IGNORECASE)
 _DEBIT_KW = re.compile(r"\b(debited|spent|paid|withdrawn|purchase)\b", re.I)
 _CREDIT_KW = re.compile(r"\b(credited|received|deposited|refund)\b", re.I)
+# "Avl Bal: Rs 12,345.67", "Available Balance is INR 1,234", "Bal Rs.500"
+_BALANCE = re.compile(
+    r"(?:avl\.?\s*bal(?:ance)?|available\s+bal(?:ance)?|a/c\s+bal(?:ance)?|\bbal(?:ance)?\b)"
+    r"[^\d₹]{0,25}(?:Rs\.?|INR|₹)\s*(-?[\d,]+(?:\.\d{1,2})?)",
+    re.IGNORECASE,
+)
 
 # date forms: 22-05-26, 22/05/2026, 22-May-26, 22 May 2026
 _DATE_PATTERNS = [
@@ -54,6 +60,28 @@ def _direction(text: str) -> str | None:
     if _CREDIT_KW.search(text):
         return "credit"
     return None
+
+
+def _balance(text: str) -> float | None:
+    m = _BALANCE.search(text or "")
+    if not m:
+        return None
+    try:
+        return float(m.group(1).replace(",", ""))
+    except ValueError:
+        return None
+
+
+def _has_date(text: str) -> bool:
+    for fmt, pat in _DATE_PATTERNS:
+        m = pat.search(text)
+        if m:
+            try:
+                datetime.strptime(m.group(1), fmt)
+                return True
+            except ValueError:
+                continue
+    return False
 
 
 def _date(text: str, fallback: datetime | None = None) -> str:
@@ -203,7 +231,7 @@ def parse_blinkit(sender: str, subject: str, body: str) -> dict | None:
 _DISPATCH = [
     ("hdfc_cc", lambda s, sub, b: "hdfcbank" in s and re.search(r"credit\s*card", f"{sub} {b}", re.I)),
     ("hdfc",    lambda s, sub, b: "hdfcbank" in s),
-    ("iob",     lambda s, sub, b: "iob.in" in s or "iob.co.in" in s or "indianoverseasbank" in s),
+    ("iob",     lambda s, sub, b: "iob.in" in s or "iob.co.in" in s or "iob.bank.in" in s or "indianoverseasbank" in s),
     ("swiggy",  lambda s, sub, b: "swiggy" in s),
     ("blinkit", lambda s, sub, b: "blinkit" in s or "grofers" in s),
 ]
@@ -217,9 +245,15 @@ _PARSERS = {
 
 
 def parse_email(
-    sender: str, subject: str, body: str, email_id: str | None = None
+    sender: str, subject: str, body: str, email_id: str | None = None,
+    received_at: str | None = None,
 ) -> dict | None:
     """Identify the source of an email and parse it into a transaction dict.
+
+    `received_at` (ISO, the Gmail internalDate) fixes the timestamp: used as-is
+    when the body carries no date, and to add the time of day when the body's
+    date is the same calendar day. Bank alerts with a balance ("Avl Bal Rs ...")
+    also get `balance_after`.
 
     Returns None when the email is not a recognised transaction alert.
     """
@@ -230,6 +264,15 @@ def parse_email(
         if match(sender_l, subject, body):
             txn = _PARSERS[key](sender_l, subject, body)
             if txn:
+                if received_at:
+                    if not _has_date(body):
+                        txn["ts"] = received_at
+                    elif txn["ts"][:10] == received_at[:10]:
+                        txn["ts"] = received_at
+                if txn.get("source") in ("hdfc", "iob") and "balance_after" not in txn:
+                    bal = _balance(body)
+                    if bal is not None:
+                        txn["balance_after"] = bal
                 txn["email_id"] = email_id
                 txn["raw_snippet"] = (subject + " — " + body)[:280]
                 return txn
@@ -239,8 +282,8 @@ def parse_email(
 
 # Sender hints — used by finance_sync.py to build the Gmail search query.
 SENDER_HINTS = [
-    "alerts@hdfcbank.net", "alerts@hdfcbank.com",
-    "iobalerts@iob.in", "noreply@iob.in",
+    "alerts@hdfcbank.net", "alerts@hdfcbank.com", "alerts@hdfcbank.bank.in",
+    "iobalerts@iob.in", "noreply@iob.in", "iobalerts@iob.bank.in",
     "noreply@swiggy.in", "no-reply@swiggy.in",
     "noreply@blinkit.com", "order-update@blinkit.com",
 ]
