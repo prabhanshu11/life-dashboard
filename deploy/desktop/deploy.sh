@@ -30,15 +30,23 @@ git -C "$REPO_DIR" fetch origin
 git -C "$REPO_DIR" checkout "$DEFAULT_BRANCH"
 git -C "$REPO_DIR" pull --ff-only origin "$DEFAULT_BRANCH"
 
-# (c) install / (re)start the user unit
-echo "==> Installing $UNIT_NAME into $UNIT_DIR"
+# (c) project venv for the finance poller (google-api-python-client etc.)
+echo "==> uv sync (project .venv for the finance poller)"
+(cd "$REPO_DIR" && uv sync --frozen --no-dev --quiet)
+
+# (d) install / (re)start the user units
+echo "==> Installing $UNIT_NAME + life-finance-sync.{service,timer} into $UNIT_DIR"
 mkdir -p "$UNIT_DIR"
 cp "$UNIT_SRC" "$UNIT_DIR/$UNIT_NAME"
+cp "$REPO_DIR/deploy/desktop/life-finance-sync.service" "$UNIT_DIR/"
+cp "$REPO_DIR/deploy/desktop/life-finance-sync.timer" "$UNIT_DIR/"
 systemctl --user daemon-reload
 systemctl --user enable --now "$UNIT_NAME"
 systemctl --user restart "$UNIT_NAME"
+# Timer ON: until the one-time Gmail consent the run exits 3 (harmless).
+systemctl --user enable --now life-finance-sync.timer
 
-# (d) wait for health
+# (e) wait for health
 echo "==> Waiting for $HEALTH_URL"
 for i in $(seq 1 15); do
     if out=$(curl -fsS "$HEALTH_URL" 2>/dev/null); then

@@ -1,0 +1,308 @@
+{
+ "mock": true,
+ "generated_at": "2026-10-01T20:45:00",
+ "total_transactions": 70,
+ "burn_rate_daily": 0.0,
+ "spend_month": 0.0,
+ "week": {
+  "spend": 22955.0,
+  "income": 85000.0,
+  "n": 12,
+  "from": "2026-09-24T20:45",
+  "to": "2026-10-01T20:45"
+ },
+ "last_week": {
+  "spend": 5491.0,
+  "income": 0.0,
+  "n": 12,
+  "from": "2026-09-17T20:45",
+  "to": "2026-09-24T20:45"
+ },
+ "delta_pct": 318.0,
+ "balance_series": [
+  {
+   "date": "2026-09-02",
+   "net": 0.0,
+   "cum_net": 0.0,
+   "balance": 131020.25
+  },
+  {
+   "date": "2026-09-03",
+   "net": -1325.0,
+   "cum_net": -1325.0,
+   "balance": 129695.25
+  },
+  {
+   "date": "2026-09-04",
+   "net": -856.0,
+   "cum_net": -2181.0,
+   "balance": 128839.25
+  },
+  {
+   "date": "2026-09-05",
+   "net": -491.0,
+   "cum_net": -2672.0,
+   "balance": 128348.25
+  },
+  {
+   "date": "2026-09-06",
+   "net": 0.0,
+   "cum_net": -2672.0,
+   "balance": 128348.25
+  },
+  {
+   "date": "2026-09-07",
+   "net": -814.0,
+   "cum_net": -3486.0,
+   "balance": 127534.25
+  },
+  {
+   "date": "2026-09-08",
+   "net": -961.0,
+   "cum_net": -4447.0,
+   "balance": 126573.25
+  },
+  {
+   "date": "2026-09-09",
+   "net": 0.0,
+   "cum_net": -4447.0,
+   "balance": 126573.25
+  },
+  {
+   "date": "2026-09-10",
+   "net": -279.0,
+   "cum_net": -4726.0,
+   "balance": 126294.25
+  },
+  {
+   "date": "2026-09-11",
+   "net": 0.0,
+   "cum_net": -4726.0,
+   "balance": 126294.25
+  },
+  {
+   "date": "2026-09-12",
+   "net": -1047.0,
+   "cum_net": -5773.0,
+   "balance": 125247.25
+  },
+  {
+   "date": "2026-09-13",
+   "net": -1380.0,
+   "cum_net": -7153.0,
+   "balance": 123867.25
+  },
+  {
+   "date": "2026-09-14",
+   "net": 0.0,
+   "cum_net": -7153.0,
+   "balance": 123867.25
+  },
+  {
+   "date": "2026-09-15",
+   "net": -883.0,
+   "cum_net": -8036.0,
+   "balance": 122984.25
+  },
+  {
+   "date": "2026-09-16",
+   "net": -1477.0,
+   "cum_net": -9513.0,
+   "balance": 121507.25
+  },
+  {
+   "date": "2026-09-17",
+   "net": -1510.0,
+   "cum_net": -11023.0,
+   "balance": 119997.25
+  },
+  {
+   "date": "2026-09-18",
+   "net": 0.0,
+   "cum_net": -11023.0,
+   "balance": 119997.25
+  },
+  {
+   "date": "2026-09-19",
+   "net": 0.0,
+   "cum_net": -11023.0,
+   "balance": 119997.25
+  },
+  {
+   "date": "2026-09-20",
+   "net": -1156.0,
+   "cum_net": -12179.0,
+   "balance": 118841.25
+  },
+  {
+   "date": "2026-09-21",
+   "net": -1399.0,
+   "cum_net": -13578.0,
+   "balance": 117442.25
+  },
+  {
+   "date": "2026-09-22",
+   "net": 0.0,
+   "cum_net": -13578.0,
+   "balance": 117442.25
+  },
+  {
+   "date": "2026-09-23",
+   "net": -1668.0,
+   "cum_net": -15246.0,
+   "balance": 115774.25
+  },
+  {
+   "date": "2026-09-24",
+   "net": -1268.0,
+   "cum_net": -16514.0,
+   "balance": 114506.25
+  },
+  {
+   "date": "2026-09-25",
+   "net": -477.0,
+   "cum_net": -16991.0,
+   "balance": 114029.25
+  },
+  {
+   "date": "2026-09-26",
+   "net": -1125.0,
+   "cum_net": -18116.0,
+   "balance": 112904.25
+  },
+  {
+   "date": "2026-09-27",
+   "net": -975.0,
+   "cum_net": -19091.0,
+   "balance": 111929.25
+  },
+  {
+   "date": "2026-09-28",
+   "net": -18509.0,
+   "cum_net": -37600.0,
+   "balance": 93420.25
+  },
+  {
+   "date": "2026-09-29",
+   "net": -418.0,
+   "cum_net": -38018.0,
+   "balance": 93002.25
+  },
+  {
+   "date": "2026-09-30",
+   "net": -1451.0,
+   "cum_net": -39469.0,
+   "balance": 91551.25
+  },
+  {
+   "date": "2026-10-01",
+   "net": 85000.0,
+   "cum_net": 45531.0,
+   "balance": 176551.25
+  }
+ ],
+ "balance_accounts": [
+  {
+   "name": "HDFC Savings 4321",
+   "type": "savings",
+   "balance": 64210.75,
+   "last_updated": "2026-10-01T20:45:00"
+  },
+  {
+   "name": "IOB 5566",
+   "type": "savings",
+   "balance": 112340.5,
+   "last_updated": "2026-10-01T20:45:00"
+  }
+ ],
+ "top_categories_week": [
+  {
+   "category": "rent",
+   "total": 18000.0,
+   "n": 1,
+   "share": 0.784
+  },
+  {
+   "category": "groceries",
+   "total": 1520.0,
+   "n": 3,
+   "share": 0.066
+  },
+  {
+   "category": "transport",
+   "total": 1224.0,
+   "n": 4,
+   "share": 0.053
+  },
+  {
+   "category": "shopping",
+   "total": 1153.0,
+   "n": 1,
+   "share": 0.05
+  },
+  {
+   "category": "food",
+   "total": 1058.0,
+   "n": 2,
+   "share": 0.046
+  }
+ ],
+ "recent": [
+  {
+   "ts": "2026-10-01T09:45:00",
+   "amount": 85000.0,
+   "direction": "credit",
+   "account": "IOB 5566",
+   "merchant": "SALARY",
+   "category": "salary"
+  },
+  {
+   "ts": "2026-09-30T21:56:00",
+   "amount": 298.0,
+   "direction": "debit",
+   "account": "HDFC CC 9876",
+   "merchant": "UBER INDIA",
+   "category": "transport"
+  },
+  {
+   "ts": "2026-09-30T17:01:00",
+   "amount": 1153.0,
+   "direction": "debit",
+   "account": "HDFC CC 9876",
+   "merchant": "AMAZON PAY INDIA",
+   "category": "shopping"
+  },
+  {
+   "ts": "2026-09-29T10:53:00",
+   "amount": 418.0,
+   "direction": "debit",
+   "account": "HDFC CC 9876",
+   "merchant": "UBER INDIA",
+   "category": "transport"
+  },
+  {
+   "ts": "2026-09-28T19:01:00",
+   "amount": 310.0,
+   "direction": "debit",
+   "account": "Blinkit",
+   "merchant": "Blinkit",
+   "category": "groceries"
+  }
+ ],
+ "last_sync": {
+  "ts": "2026-10-01T20:30:02",
+  "days_back": 7,
+  "counts": {
+   "fetched": 9,
+   "parsed": 8,
+   "inserted": 2,
+   "duplicates": 6,
+   "not_a_transaction": 1
+  },
+  "error": null,
+  "last_success": "2026-10-01T20:30:02",
+  "duration_s": 3.41
+ },
+ "new_since": "2026-10-01T09:45:00",
+ "last_inserted_at": "2026-10-01T16:57:35Z"
+}

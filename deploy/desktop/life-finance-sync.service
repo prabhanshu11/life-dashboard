@@ -1,0 +1,18 @@
+# Finance poller: Gmail bank alerts -> pi/finance.db (one-shot, fired by
+# life-finance-sync.timer every 30 min). Installed by deploy/desktop/deploy.sh.
+# Exit 3 = no Gmail token yet (scripts/gmail_authorize.py not run): counted as
+# success so the unit is not "failed" while waiting for the one-time consent.
+# Last run: ~/.local/state/life-dashboard/finance-sync-last.json
+[Unit]
+Description=Life Dashboard finance poller (Gmail bank alerts -> ledger)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/prabhanshu/Programs/life-dashboard
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/prabhanshu/Programs/life-dashboard/.venv/bin/python -m pi.finance_sync
+SuccessExitStatus=3
+Nice=10
+TimeoutStartSec=10min

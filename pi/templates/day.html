@@ -257,10 +257,21 @@ footer p { margin: 6px 0; }
 </section>
 </div>
 
+<section class="list" id="exercise" hidden aria-label="Exercise">
+  <h2>Exercise</h2>
+  <p id="exercisenote"></p>
+</section>
+
 <section class="list" id="departures" hidden aria-label="Departures and returns">
   <h2 id="deptitle">Departures</h2>
   <p class="faint" id="depnote"></p>
   <table id="deptable"><thead><tr><th>left</th><th>who</th><th>door</th><th>from</th><th>back</th><th>away</th><th></th></tr></thead><tbody></tbody></table>
+</section>
+
+<section class="list" id="nothing" hidden aria-label="Looking at nothing">
+  <h2 id="nothingtitle">Looking at nothing</h2>
+  <p class="faint" id="nothingnote"></p>
+  <table id="nothingtable"><thead><tr><th>from</th><th>to</th><th>min</th><th>view</th><th>counted by</th><th>ended by</th></tr></thead><tbody></tbody></table>
 </section>
 
 <footer id="foot"></footer>
@@ -481,8 +492,12 @@ footer p { margin: 6px 0; }
 
     // Table view of today
     const tb = $("#segtable tbody"); tb.innerHTML = "";
-    $("#listtitle").textContent = `${dayLong(today)}, as segments of 5 minutes or more`;
-    for (const s of (segs[today] || []).filter((s) => s.b - s.a >= 5 && s.a < now.min)) {
+    $("#listtitle").textContent = `${dayLong(today)}, as segments of 5 minutes or more, newest first`;
+    // Newest first (his 09-07 14:45: "the latest items should be on top, so
+    // that no scrolling is needed"). Same rows as before, reversed order.
+    const todaySegs = (segs[today] || []).filter((s) => s.b - s.a >= 5 && s.a < now.min)
+      .sort((x, y) => y.a - x.a);
+    for (const s of todaySegs) {
       const tr = document.createElement("tr");
       tr.innerHTML = `<td class="t">${hm(s.a)} - ${hm(Math.min(s.b, now.min))}</td>
         <td><span class="sw seg" data-state="${s.state}" style="position:static"></span>${describe(s)}${s.label ? ` <b>(${s.label})</b>` : ""} <span class="ev">${s.state === "offline" ? "" : (s.person_frac != null ? `seen in ${Math.round(s.person_frac * 100)}% of scans` : "")}${s.confidence < 0.5 && !s.gap ? " · low confidence" : ""}</span></td>
@@ -686,10 +701,86 @@ footer p { margin: 6px 0; }
     else { active = null; tip.hidden = true; }
   });
 
+  // Looking at nothing (his words 09-24 11:05: "you were able to fool me with statistics … how much time camera
+  // has spent just looking at nothing"): the camera's own daily report files (star-trek-camera
+  // scripts/analysis/looking_at_nothing.py timer), via /api/day/looking-at-nothing. Hours with n, never a %.
+  // Newest first (his 09-07: "the latest items should be on top").
+  function renderNothing(ln) {
+    const sec = $("#nothing");
+    if (!ln || !ln.online || !Array.isArray(ln.days) || !ln.days.length) { sec.hidden = true; return; }
+    const hm = (s) => (s || "").slice(-5);
+    const line = (d, label) => {
+      if (!d.report) return `${label}: no report for ${d.day}.`;
+      const t = d.two_signal;
+      const two = t ? `<b>${t.hours} h</b> (n ${t.n}${t.n ? `, longest ${t.longest_min} min` : ""})`
+                    : `not in this report yet`;
+      const ends = Object.entries(d.ended_by || {}).map(([k, v]) => `${k} ${v.n}`).join(", ");
+      return `${label}: looking at nothing, ≥ 10 min — two local person signals ${two} · deployed definition ` +
+        `<b>${d.hours} h</b> (n ${d.n}${d.n ? `, longest ${d.longest_min} min` : ""}). ` +
+        `≥ 2 min: ${d.hours_2min} h (n ${d.n_2min}); frozen-box upper bound ${d.frozen_hours} h (n ${d.frozen_n}); ` +
+        `someone came back into the held view during ${d.someone_home_h} h (n ${d.someone_home_n}).` +
+        (ends ? ` Ended by: ${ends}.` : "") + ` <span class="faint">Cycles cover ${d.covered_h} h, to ${hm(d.cycles_last)}.</span>`;
+    };
+    const [today, ...before] = ln.days;
+    $("#nothingtitle").textContent = `Looking at nothing ${dayLong(today.day)}`;
+    $("#nothingnote").innerHTML = `<span>${line(today, "Today so far")}</span><br>` +
+      before.map((d) => `<span>${line(d, dayLong(d.day))}</span>`).join("<br>") +
+      `<br><span>The deployed definition misses time held by ghost boxes (e.g. 09-29 16:53–18:16 empty office chair).</span>` +
+      `<br><span class="faint">Deployed: ${esc(ln.definition)}. Two local signals: a stock box counts as someone only if the ` +
+      `lying model or perception_v2 (him) also fires on ≥ 5 % of the rows within ±30 s. A still sleeper nobody detects ` +
+      `still counts as nothing in both.</span>`;
+    const tb = $("#nothingtable tbody"); tb.innerHTML = "";
+    const key = (r) => `${r.start_ist}|${r.end_ist}`;
+    const strict = new Set((today.stretches || []).map(key));
+    const rows = (today.two_signal ? today.two_signal.stretches : today.stretches || []).slice();
+    for (const r of (today.stretches || [])) if (today.two_signal && !rows.some((x) => key(x) === key(r))) rows.push(r);
+    rows.sort((a, b) => (b.start || 0) - (a.start || 0));
+    for (const r of rows) {
+      const inStrict = strict.has(key(r));
+      const inTwo = !today.two_signal || today.two_signal.stretches.some((x) => key(x) === key(r));
+      const by = today.two_signal ? (inStrict && inTwo ? "both" : inTwo ? "two signals only (a ghost box held it)" : "deployed only") : "deployed";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td class="t">${hm(r.start_ist)}</td><td class="t">${hm(r.end_ist)}</td>
+        <td class="d">${r.minutes}</td><td>${esc(r.place || `pan ${r.pan} / tilt ${r.tilt}`)}</td>
+        <td>${esc(by)}</td>
+        <td class="ev">${esc(r.ended_by || "")}${r.who_entered ? " · " + esc(r.who_entered) : ""}</td>`;
+      tb.appendChild(tr);
+    }
+    sec.hidden = false;
+  }
+
+  // Exercise (his 09-06 14:25: "these exercise log needs to be reflected on
+  // /day and the habit tracker view"). Only the two records that already
+  // exist: the camera timeline's `treadmill` minutes per day (the /api/day
+  // answer already carries them) and the habit tracker's own "Exercise" row
+  // (/api/habits). Nothing is inferred; a day with no record says so.
+  function renderExercise(day, habits) {
+    const sec = $("#exercise");
+    const parts = [];
+    if (day && day.online && Array.isArray(day.days) && day.days.length) {
+      const rows = day.days.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+      parts.push("Camera, on the treadmill: " + rows.map((d) => {
+        const m = Math.round((d.minutes || {}).treadmill || 0);
+        return `${dayShort(d.date)} <b>${m ? durShort(m) : "none"}</b>`;
+      }).join(" · ") + ".");
+    }
+    const ex = Array.isArray(habits) ? habits.find((h) => h && h.name === "Exercise") : null;
+    if (ex) {
+      const last = ex.last_logged ? new Date(String(ex.last_logged).replace(" ", "T") + "Z") : null;
+      const lastTxt = last && !isNaN(last) ? last.toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "never";
+      parts.push(`Habit tracker, "Exercise": ${ex.done_today ? `<b>done today</b> (${ex.done_today}×)` : "not logged today"}; last logged ${esc(lastTxt)}; streak ${ex.streak || 0} day${ex.streak === 1 ? "" : "s"}.`);
+    }
+    if (!parts.length) { sec.hidden = true; return; }
+    $("#exercisenote").innerHTML = parts.map((x) => `<span>${x}</span>`).join("<br>");
+    sec.hidden = false;
+  }
+
   async function load() {
+    let dayData = null;
     try {
       const r = await fetch("/api/day?days=4", { cache: "no-store" });
-      render(await r.json());
+      dayData = await r.json();
+      render(dayData);
     } catch (e) {
       const status = $("#status"); status.hidden = false;
       status.textContent = "Could not load /api/day: " + e;
@@ -702,6 +793,22 @@ footer p { margin: 6px 0; }
       vol = { online: false, error: String(e) };
     }
     renderTracking(vol);
+    let ln = null;
+    try {
+      const r = await fetch("/api/day/looking-at-nothing?days=2", { cache: "no-store" });
+      ln = await r.json();
+    } catch (e) {
+      ln = { online: false, error: String(e) };
+    }
+    renderNothing(ln);
+    let habits = null;
+    try {
+      const r = await fetch("/api/habits", { cache: "no-store" });
+      habits = r.ok ? await r.json() : null;
+    } catch (e) {
+      habits = null;
+    }
+    renderExercise(dayData, habits);
   }
   load();
   setInterval(load, 60_000);
