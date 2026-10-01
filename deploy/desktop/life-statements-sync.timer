@@ -1,0 +1,9 @@
+[Unit]
+Description=Run the Life Dashboard statements poller daily at 07:10
+
+[Timer]
+OnCalendar=*-*-* 07:10:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

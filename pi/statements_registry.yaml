@@ -1,0 +1,224 @@
+# Statement / invoice attachment registry (lane statements-1002, 2026-10-02).
+#
+# Maps a mail sender -> storage folder, pass entry, password hint, parser.
+# NO SECRETS HERE (public repo): passwords live only in `pass` on the desktop,
+# at password.pass_entry (first line = the PDF password). `hint` is a plain-words
+# description of the bank's recipe so he knows what to type into `pass insert`.
+#
+# Seeded from the mailbox itself (discovery 2026-10-02, has:attachment, 400 days).
+# Fields:
+#   id         short key; also the folder under ~/.local/state/life-dashboard/statements/
+#   match.from         sender addresses (lower case, exact)
+#   match.subject_regex / filename_regex   optional: the attachment is kept only if they match
+#   skip.subject_regex / filename_regex    optional: never download these (e.g. PIN mailers)
+#   kind       bank | card | app | broker | utility
+#   password.needed    true | false | unknown  (what we expect; the run records what it found)
+#   parser     name in pi/statements_pdf.PARSERS, or null (store + open only)
+#
+# Add a sender: append an entry, then `uv run python -m pi.statements_sync --days 90`.
+# Add a password: `pass insert finance/statements/<id>` on the DESKTOP; the next run opens
+# every file of that source that is still locked.
+
+sources:
+  - id: hdfc_savings
+    name: HDFC Bank savings (Combined Email Statement)
+    match:
+      from: [hdfcbanksmartstatement@hdfcbank.bank.in, hdfcbanksmartstatement@hdfcbank.net]
+      filename_regex: '(?i)\.pdf$'
+    kind: bank
+    folder: hdfc_savings
+    password:
+      pass_entry: finance/statements/hdfc_savings
+      hint: "HDFC Customer ID (the number you log in to NetBanking with)"
+      needed: true
+    parser: hdfc_savings
+
+  - id: hdfc_cc
+    name: HDFC Bank credit cards (Diners Privilege + UPI RuPay statements)
+    match:
+      from: [emailstatements.cards@hdfcbank.bank.in, emailstatements.cards@hdfcbank.net]
+      filename_regex: '(?i)\.pdf$'
+    kind: card
+    folder: hdfc_cc
+    password:
+      pass_entry: finance/statements/hdfc_cc
+      hint: "first 4 letters of your name in CAPITALS + birth date and month DDMM, e.g. PRAB0107"
+      needed: true
+    parser: hdfc_cc
+
+  - id: hdfc_cc_emi
+    name: HDFC credit card EasyEMI amortisation schedules
+    match:
+      from: [termloans.creditcard@hdfcbank.bank.in, termloans.creditcard@hdfcbank.net]
+    kind: card
+    folder: hdfc_cc_emi
+    password:
+      pass_entry: finance/statements/hdfc_cc_emi
+      hint: "unknown; HDFC usually uses the card recipe (NAME4 + DDMM) or the Customer ID"
+      needed: unknown
+    parser: null
+
+  - id: iob
+    name: Indian Overseas Bank e-statements
+    match:
+      from: [eseeadm@iob.bank.in, iobesee@iob.in, eseeadm@iob.in, iobesee@iob.bank.in]
+    skip:
+      # the "Pin Reset" / "E-See banking" mails carry a PIN / password letter, not a statement:
+      # never download or decrypt those
+      subject_regex: '(?i)pin\s*reset|e-?see\s*banking|password'
+      filename_regex: '(?i)(pin|pwd)\.pdf$'
+    kind: bank
+    folder: iob
+    password:
+      pass_entry: finance/statements/iob
+      hint: "unknown until the first IOB statement arrives (often customer ID or DOB DDMMYYYY)"
+      needed: unknown
+    parser: null
+
+  - id: zerodha
+    name: Zerodha (weekly/quarterly account, holdings, retention statements)
+    match:
+      from:
+        - no-reply-account-statement@reportsmailer.zerodha.net
+        - no-reply-transaction-with-holding-statement@reportsmailer.zerodha.net
+        - no-reply-retention-statements@reportsmailer.zerodha.net
+        - no-reply-contract-notes@reportsmailer.zerodha.net
+    kind: broker
+    folder: zerodha
+    password:
+      pass_entry: finance/statements/zerodha
+      hint: "PAN in CAPITALS (ABCDE1234F)"
+      needed: true
+    parser: null
+
+  - id: nse
+    name: NSE funds / securities balance confirmations
+    match:
+      from: [nse_alerts@nse.co.in]
+    kind: broker
+    folder: nse
+    password:
+      pass_entry: finance/statements/nse
+      hint: "PAN in CAPITALS (ABCDE1234F), NSE's usual recipe"
+      needed: unknown
+    parser: null
+
+  - id: cdsl_cas
+    name: CDSL Consolidated Account Statement (mutual funds + demat)
+    match:
+      from: [ecas@cdslstatement.com]
+    kind: broker
+    folder: cdsl_cas
+    password:
+      pass_entry: finance/statements/cdsl_cas
+      hint: "PAN in CAPITALS (ABCDE1234F)"
+      needed: true
+    parser: null
+
+  - id: jio
+    name: JioFiber e-bill
+    match:
+      from: [ebill.home@jio.com]
+    kind: utility
+    folder: jio
+    password:
+      pass_entry: finance/statements/jio
+      hint: "unknown (Jio bills are usually open)"
+      needed: unknown
+    parser: null
+
+  - id: airtel
+    name: Airtel Wi-Fi bill
+    match:
+      from: [ebill@airtel.com]
+    kind: utility
+    folder: airtel
+    password:
+      pass_entry: finance/statements/airtel
+      hint: "unknown (Airtel bills are usually open)"
+      needed: unknown
+    parser: null
+
+  - id: zomato
+    name: Zomato order invoices
+    match:
+      from: [noreply@zomato.com, noreply@mailers.zomato.com]
+      filename_regex: '(?i)invoice.*\.pdf$|order_id.*\.pdf$'
+    kind: app
+    folder: zomato
+    password: {pass_entry: finance/statements/zomato, hint: "none expected", needed: false}
+    parser: null
+
+  - id: swiggy
+    name: Swiggy order invoices
+    match:
+      from: [noreply@swiggy.in, no-reply@swiggy.in]
+    kind: app
+    folder: swiggy
+    password: {pass_entry: finance/statements/swiggy, hint: "none expected", needed: false}
+    parser: null
+
+  - id: blinkit
+    name: Blinkit order invoices
+    match:
+      from: [noreply@blinkit.com, order-update@blinkit.com]
+    kind: app
+    folder: blinkit
+    password: {pass_entry: finance/statements/blinkit, hint: "none expected", needed: false}
+    parser: null
+
+  - id: rapido
+    name: Rapido ride receipts
+    match:
+      from: [partner@rapido.bike, shoutout@rapido.bike]
+    kind: app
+    folder: rapido
+    password: {pass_entry: finance/statements/rapido, hint: "none expected", needed: false}
+    parser: null
+
+  - id: porter
+    name: Porter (rides, packers and movers)
+    match:
+      from: [no-reply@porter.in, packermover@porter.in]
+    kind: app
+    folder: porter
+    password: {pass_entry: finance/statements/porter, hint: "none expected", needed: false}
+    parser: null
+
+  - id: ai_subscriptions
+    name: AI subscriptions (Anthropic, OpenAI, OpenRouter receipts)
+    match:
+      from:
+        - invoice+statements@mail.anthropic.com
+        - invoice+statements+acct_1horswc6h1nxgoi3@stripe.com
+        - billing+acct_1horswc6h1nxgoi3@stripe.com
+        - invoice+statements@openrouter.ai
+    kind: app
+    folder: ai_subscriptions
+    password: {pass_entry: finance/statements/ai_subscriptions, hint: "none expected", needed: false}
+    parser: null
+
+  - id: travel
+    name: Travel tax invoices / tickets (IndiGo, Akasa, Air India Express, SmartBuy, Goibibo)
+    match:
+      from:
+        - 6egstinvoice@goindigo.in
+        - updates@travel-akasaair.in
+        - noreply-gstinvoice@booking.airindiaexpress.com
+        - donotreply@smartbuyoffers.co
+        - noreply@goibibo.com
+      filename_regex: '(?i)\.pdf$'
+    kind: app
+    folder: travel
+    password: {pass_entry: finance/statements/travel, hint: "none expected", needed: false}
+    parser: null
+
+  - id: wazirx
+    name: WazirX invoices and scheme reports
+    match:
+      from: [noreply@wazirx.com]
+      filename_regex: '(?i)\.pdf$'
+    kind: broker
+    folder: wazirx
+    password: {pass_entry: finance/statements/wazirx, hint: "none expected", needed: false}
+    parser: null

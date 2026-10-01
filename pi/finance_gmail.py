@@ -50,7 +50,8 @@ class GmailTokenError(RuntimeError):
 
 
 # ── quota: units, pacing, budget, backoff ───────────────────────────────────
-UNITS = {"list": 5, "get": 5}  # Gmail API quota units per call (Google's usage-limits table)
+UNITS = {"list": 5, "get": 5, "attachment": 5}  # Gmail API quota units per call (Google's usage-limits table;
+# "attachment" = messages.attachments.get, used by pi/statements_gmail.py)
 DEFAULT_UNITS_PER_RUN = 5000
 # The console says 6,000 "Total Query Cost" / user / minute, but live runs were refused at
 # 520 and 580 documented units in a rolling minute (2026-10-02 01:21 and 01:31), i.e. ~1/10:
@@ -108,7 +109,7 @@ class QuotaMeter:
             self._nap(max(wait, 0.05))
         self._win.append((self.clock(), units))
         self.spent += units
-        self.calls[kind] += 1
+        self.calls[kind] = self.calls.get(kind, 0) + 1
 
 
 def _status(e: Exception) -> int | None:

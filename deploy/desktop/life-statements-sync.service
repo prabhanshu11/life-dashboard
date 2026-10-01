@@ -1,0 +1,19 @@
+# Statements poller: Gmail statement/invoice attachments -> ~/.local/state/life-dashboard/statements/
+# -> opened with `pass` (finance/statements/<id>) -> HDFC statements parsed into pi/finance.db.
+# One-shot, fired daily 07:10 by life-statements-sync.timer (or POST /api/statements/sync).
+# Wants+After the finance sync so the e-mail alerts are in the ledger before statement rows are
+# matched against them. Installed by deploy/desktop/deploy.sh. Exit 3 = no Gmail token (success).
+# Last run: ~/.local/state/life-dashboard/statements-sync-last.json
+[Unit]
+Description=Life Dashboard statements poller (Gmail attachments -> pass-opened PDFs -> ledger)
+After=network-online.target life-finance-sync.service
+Wants=network-online.target life-finance-sync.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/prabhanshu/Programs/life-dashboard
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/home/prabhanshu/Programs/life-dashboard/.venv/bin/python -m pi.statements_sync --days 90
+SuccessExitStatus=3
+Nice=10
+TimeoutStartSec=20min

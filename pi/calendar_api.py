@@ -18,6 +18,7 @@ import day_tracking
 import finance_db
 import finance_parsers
 import finance_sync
+import statements_sync
 
 finance_db.init_db()
 
@@ -569,7 +570,34 @@ async def finance_wall() -> dict:
         "burn_rate_daily": s["burn_rate_daily"],
         "spend_month": s["spend_month"],
         **w,
+        "statements": _statements_wall(),
     }
+
+
+def _statements_wall() -> dict:
+    """{locked, locked_sources, total, last, ...}: the slide's 'N statements waiting for a password'."""
+    try:
+        return statements_sync.wall_block()
+    except Exception as e:  # noqa: BLE001 - never break the finance slide
+        return {"locked": 0, "total": 0, "last": None, "error": f"{type(e).__name__}: {e}"}
+
+
+@app.get("/api/statements")
+async def statements_summary() -> dict:
+    """Registry + per-source last file and status counts + locked sources with hints."""
+    return statements_sync.api_summary()
+
+
+@app.get("/api/statements/locked")
+async def statements_locked() -> list:
+    """Sources whose PDFs wait for a password: hint + the exact `pass insert` command."""
+    return statements_sync.locked_list()
+
+
+@app.post("/api/statements/sync")
+async def statements_sync_endpoint() -> dict:
+    """Start the statements poller (life-statements-sync.service, non-blocking)."""
+    return statements_sync.trigger_sync()
 
 
 @app.get("/api/finance/transactions")

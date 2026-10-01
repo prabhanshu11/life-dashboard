@@ -40,11 +40,15 @@ mkdir -p "$UNIT_DIR"
 cp "$UNIT_SRC" "$UNIT_DIR/$UNIT_NAME"
 cp "$REPO_DIR/deploy/desktop/life-finance-sync.service" "$UNIT_DIR/"
 cp "$REPO_DIR/deploy/desktop/life-finance-sync.timer" "$UNIT_DIR/"
+cp "$REPO_DIR/deploy/desktop/life-statements-sync.service" "$UNIT_DIR/"
+cp "$REPO_DIR/deploy/desktop/life-statements-sync.timer" "$UNIT_DIR/"
 systemctl --user daemon-reload
 systemctl --user enable --now "$UNIT_NAME"
 systemctl --user restart "$UNIT_NAME"
 # Timer ON: until the one-time Gmail consent the run exits 3 (harmless).
 systemctl --user enable --now life-finance-sync.timer
+# Statements poller: daily 07:10, after a fresh finance sync (Wants/After in the unit).
+systemctl --user enable --now life-statements-sync.timer
 
 # (e) wait for health
 echo "==> Waiting for $HEALTH_URL"

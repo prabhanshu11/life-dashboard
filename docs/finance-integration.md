@@ -143,3 +143,36 @@ curl -s -X POST http://localhost:8080/api/finance/parse-email \
   -d '{"sender":"…","subject":"…","body":"…","email_id":"…"}'
 ```
 The response includes the parsed transaction or `status: not_a_transaction`.
+
+## C. Statements poller (attachments, wired 2026-10-02, lane statements-1002)
+
+His words (2026-10-02): "get all the attachments and the account statements and various statements of
+various apps. Some of them would be password protected, so we will have to create a database and store
+those passwords so that those files can be opened as and when they arrive".
+
+```
+life-statements-sync.timer (daily 07:10; the unit Wants+After life-finance-sync.service)
+  -> .venv/bin/python -m pi.statements_sync --days 90
+     -> pi/statements_registry.yaml: sender -> source id, folder, pass entry, hint, parser (NO secrets)
+     -> Gmail (same paced client + unit counter as finance_gmail): registry senders with attachments,
+        each message fetched once, each kept attachment downloaded once (attachments_seen)
+     -> ~/.local/state/life-dashboard/statements/<source>/<YYYY-MM-DD>-<filename>   (dir 700, file 600)
+     -> encrypted PDF? empty password, else `pass show finance/statements/<source>` (first line)
+        -> <name>.open.pdf beside it; no entry / wrong password -> status locked + hint (retried once a run)
+     -> hdfc_savings / hdfc_cc parsers -> transactions (source 'statement', email_id stmt:<sha256>:<n>),
+        except rows that match an e-mail alert (direction, amount, date +-1 day, account HDFC*): those
+        are linked in statement_rows.matched_email_id instead; card bill payments are skipped
+     -> discovery: has:attachment filename:pdf, headers + filenames only, into attachment_discovery
+     -> ~/.local/state/life-dashboard/statements-sync-last.json
+GET  /api/statements          registry + per-source last file + status counts + locked + discovery
+GET  /api/statements/locked   sources waiting for a password: hint + `pass insert ...` command
+POST /api/statements/sync     starts life-statements-sync.service (non-blocking)
+GET  /api/finance/wall        + statements {locked, locked_sources, total, last, last_sync, error}
+```
+
+Passwords live ONLY in `pass` on the desktop (`pass insert finance/statements/<id>`, first line = the
+PDF password). `pass` runs with `--batch --pinentry-mode error` and a 20 s timeout, so the timer never
+pops a pinentry and never hangs on a gpg lock; such a failure shows as `locked` with the reason.
+Report of what is locked: `uv run python -m pi.statements_sync --report` or `/api/statements/locked`.
+Add a sender: append to the registry (match.from + optional subject/filename regexes, skip.* for mails
+that must never be downloaded, e.g. IOB PIN letters) and re-run.

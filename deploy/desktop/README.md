@@ -41,6 +41,19 @@ ssh desktop 'systemctl --user list-timers | grep finance; cat ~/.local/state/lif
 The agent rules below allow restarting `life-dashboard` and starting
 `life-finance-sync.service` (its own one-shot).
 
+## Statements poller (timer)
+
+`deploy.sh` also installs `life-statements-sync.service` + `.timer` (daily 07:10; the
+service pulls a finance sync first). It downloads statement / invoice attachments into
+`~/.local/state/life-dashboard/statements/<source>/` and opens protected PDFs with
+`pass show finance/statements/<source>` (see `docs/finance-integration.md` §C). Check it:
+
+```bash
+ssh desktop 'cat ~/.local/state/life-dashboard/statements-sync-last.json; curl -s 127.0.0.1:8090/api/statements/locked'
+```
+
+Agents may start `life-statements-sync.service` (its own one-shot).
+
 ## Rules for agents
 
 - `life-dashboard.service` is the dashboard's OWN service and the ONLY unit an
