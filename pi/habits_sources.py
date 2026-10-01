@@ -8,7 +8,11 @@ tokens spent also in that view".
 - tokens: Claude Code usage per local day from datalake.db (DATALAKE_DB),
   claude_messages joined to claude_sessions for the machine (source_device).
   Claude Code writes one row per content block with the same usage, so rows
-  are de-duplicated by request_id before summing. Cached 15 min.
+  are de-duplicated by request_id before summing. Merged with the per-machine
+  files of local-bootstrapping's claude-tokens-export (~/.local/state/
+  claude-tokens/<host>.json; the laptop pushes its own): per host-day the
+  larger of export vs datalake wins, never the sum. stale = newest export
+  older than 2 h (no exports: newest datalake row older than 6 h). Cached 15 min.
 
 Both answer {"stale": true, "error": ...} instead of raising.
 
@@ -20,6 +24,7 @@ Cache writes are priced at the 5-minute rate (1.25 x input); Claude Code's
 """
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import subprocess
@@ -36,6 +41,9 @@ AUTHOR = os.environ.get("HABITS_AUTHOR", "mail.prabhanshu@gmail.com")
 DATALAKE_DB = Path(os.path.expanduser(os.environ.get("DATALAKE_DB", "~/Programs/datalake/datalake.db")))
 CACHE_TTL_S = 900
 TOKENS_STALE_H = 6
+TOKENS_EXPORT_DIR = Path(os.path.expanduser(os.environ.get(
+    "HABITS_TOKENS_EXPORT_DIR", "~/.local/state/claude-tokens")))
+TOKENS_EXPORT_STALE_H = 2
 
 # model-id prefix -> (input, output, cache_read, cache_write_5m) USD per MTok
 PRICES = [
@@ -151,20 +159,40 @@ def price_for(model: str | None):
     return None
 
 
-def tokens(days: int = 14, *, now: datetime | None = None, db_path: Path | None = None) -> dict:
+def tokens(days: int = 14, *, now: datetime | None = None, db_path: Path | None = None,
+           export_dir: Path | None = None) -> dict:
     now = now or datetime.now(TZ)
     db_path = Path(db_path or DATALAKE_DB)
-    return _cached(("tokens", days, str(db_path), now.date(), now.hour),
-                   lambda: _tokens(days, now, db_path))
+    export_dir = Path(export_dir or TOKENS_EXPORT_DIR)
+    return _cached(("tokens", days, str(db_path), str(export_dir), now.date(), now.hour),
+                   lambda: _tokens(days, now, db_path, export_dir))
 
 
-def _tokens(days: int, now: datetime, db_path: Path) -> dict:
-    want = _window(days, now)
-    base = {"days": [], "db": str(db_path), "prices_usd_per_mtok": {k: dict(zip(
-        ("input", "output", "cache_read", "cache_write_5m"), v)) for k, v in PRICES},
-        "generated": now.isoformat(timespec="seconds")}
+def _blank(host: str | None = None) -> dict:
+    return {"host": host, "input": 0, "output": 0, "cache_read": 0, "cache_creation": 0, "total": 0,
+            "cost_usd_est": 0.0, "unpriced_tokens": 0, "sessions": 0, "models": {}}
+
+
+def _add_model(rec: dict, model: str, i: int, o: int, cr: int, cc: int) -> None:
+    tot = i + o + cr + cc
+    for k, v in (("input", i), ("output", o), ("cache_read", cr), ("cache_creation", cc), ("total", tot)):
+        rec[k] += v
+    p = price_for(model)
+    cost = (i * p[0] + o * p[1] + cr * p[2] + cc * p[3]) / 1e6 if p else None
+    if cost is None:
+        rec["unpriced_tokens"] += tot
+    else:
+        rec["cost_usd_est"] += cost
+    mm = rec["models"].setdefault(model or "unknown", {"total": 0, "cost_usd_est": None})
+    mm["total"] += tot
+    if cost is not None:
+        mm["cost_usd_est"] = (mm["cost_usd_est"] or 0.0) + cost
+
+
+def _datalake(want: list[date], now: datetime, db_path: Path):
+    """-> ({date: {device: rec}}, latest_by_device, error)."""
     if not db_path.exists():
-        return base | {"stale": True, "error": f"{db_path} not found on {os.uname().nodename}"}
+        return {}, {}, f"{db_path} not found on {os.uname().nodename}"
     off_min = int(now.utcoffset().total_seconds() // 60)
     since_utc = datetime.combine(want[0], datetime.min.time(), TZ).astimezone(timezone.utc)
     q = f"""
@@ -186,57 +214,114 @@ def _tokens(days: int, now: datetime, db_path: Path) -> dict:
         finally:
             con.close()
     except Exception as e:  # noqa: BLE001
-        return base | {"stale": True, "error": str(e)[:200]}
-    per = {d.isoformat(): {"date": d.isoformat(), "input": 0, "output": 0, "cache_read": 0,
-                           "cache_creation": 0, "total": 0, "cost_usd_est": 0.0,
-                           "unpriced_tokens": 0, "sessions": 0, "by_machine": {}, "by_model": {}}
-           for d in want}
+        return {}, {}, str(e)[:200]
+    keep = {d.isoformat() for d in want}
+    out: dict[str, dict] = {}
     latest: dict[str, str] = {}
     sess: dict[tuple, set] = {}
     for d, dev, model, i, o, cr, cc, sid, mx in rows:
-        rec = per.get(d)
-        if rec is None:
+        if d not in keep:
             continue
-        tot = i + o + cr + cc
-        for k, v in (("input", i), ("output", o), ("cache_read", cr), ("cache_creation", cc), ("total", tot)):
-            rec[k] += v
-        new_day = sid not in sess.setdefault((d,), set())
-        new_dev = sid not in sess.setdefault((d, dev), set())
-        sess[(d,)].add(sid)
-        sess[(d, dev)].add(sid)
-        rec["sessions"] += int(new_day)
-        p = price_for(model)
-        cost = None
-        if p:
-            cost = (i * p[0] + o * p[1] + cr * p[2] + cc * p[3]) / 1e6
-            rec["cost_usd_est"] += cost
-        else:
-            rec["unpriced_tokens"] += tot
-        m = rec["by_machine"].setdefault(dev or "unknown", {"total": 0, "cost_usd_est": 0.0, "sessions": 0})
-        m["total"] += tot
-        m["sessions"] += int(new_dev)
-        m["cost_usd_est"] += cost or 0.0
-        mm = rec["by_model"].setdefault(model or "unknown", {"total": 0, "cost_usd_est": None})
-        mm["total"] += tot
-        if cost is not None:
-            mm["cost_usd_est"] = (mm["cost_usd_est"] or 0.0) + cost
+        dev = dev or "unknown"
+        rec = out.setdefault(d, {}).setdefault(dev, _blank())
+        _add_model(rec, model, i, o, cr, cc)
+        s = sess.setdefault((d, dev), set())
+        if sid not in s:
+            s.add(sid)
+            rec["sessions"] += 1
         if mx and (dev not in latest or mx > latest[dev]):
-            latest[dev or "unknown"] = mx
+            latest[dev] = mx
+    return out, latest, None
+
+
+def _exports(export_dir: Path, want: list[date]):
+    """~/.local/state/claude-tokens/<host>.json written by local-bootstrapping's
+    claude-tokens-export on each machine (the laptop pushes its file here).
+    -> ({date: {device: rec}}, {host: meta})."""
+    keep = {d.isoformat() for d in want}
+    out: dict[str, dict] = {}
+    meta: dict[str, dict] = {}
+    if not export_dir.is_dir():
+        return out, meta
+    for f in sorted(export_dir.glob("*.json")):
+        if f.name.startswith("."):
+            continue
+        try:
+            doc = json.loads(f.read_text())
+            host = doc.get("host") or f.stem
+            dev = doc.get("device") or host
+            gen = datetime.fromisoformat(doc["generated"])
+        except Exception as e:  # noqa: BLE001
+            meta[f.stem] = {"error": repr(e)[:120], "file": str(f)}
+            continue
+        age_h = (datetime.now(timezone.utc) - gen.astimezone(timezone.utc)).total_seconds() / 3600
+        meta[host] = {"device": dev, "generated": doc["generated"], "age_h": round(age_h, 2),
+                      "stale": age_h > TOKENS_EXPORT_STALE_H, "file": str(f)}
+        for day in doc.get("days") or []:
+            if day.get("date") not in keep:
+                continue
+            rec = _blank(host)
+            for model, m in (day.get("models") or {}).items():
+                _add_model(rec, model, *(int(m.get(k) or 0) for k in ("input", "output", "cache_read", "cache_creation")))
+            if not day.get("models"):  # no model mix: fields only, unpriced
+                _add_model(rec, None, *(int(day.get(k) or 0) for k in ("input", "output", "cache_read", "cache_creation")))
+            rec["sessions"] = int(day.get("sessions") or 0)
+            out.setdefault(day["date"], {})[dev] = rec
+    return out, meta
+
+
+def _tokens(days: int, now: datetime, db_path: Path, export_dir: Path) -> dict:
+    want = _window(days, now)
+    base = {"days": [], "db": str(db_path), "export_dir": str(export_dir),
+            "prices_usd_per_mtok": {k: dict(zip(("input", "output", "cache_read", "cache_write_5m"), v))
+                                    for k, v in PRICES},
+            "generated": now.isoformat(timespec="seconds")}
+    dl, latest, dl_err = _datalake(want, now, db_path)
+    ex, meta = _exports(export_dir, want)
+    good = [m for m in meta.values() if "generated" in m]
+    if dl_err and not good:
+        return base | {"stale": True, "error": dl_err, "exports": meta}
     out_days = []
     for d in want:
-        rec = per[d.isoformat()]
+        k = d.isoformat()
+        rec = {"date": k, "input": 0, "output": 0, "cache_read": 0, "cache_creation": 0, "total": 0,
+               "cost_usd_est": 0.0, "unpriced_tokens": 0, "sessions": 0,
+               "per_host": {}, "by_machine": {}, "by_model": {}}
+        a, b = dl.get(k, {}), ex.get(k, {})
+        # max per host-day: the export reads every transcript on that machine
+        # (incl. subagents the datalake never ingests); the datalake can be the
+        # larger one only when a machine's export is missing or behind.
+        for dev in sorted(set(a) | set(b)):
+            pick, src = (b[dev], "export") if b.get(dev) and b[dev]["total"] >= a.get(dev, {"total": -1})["total"] \
+                else (a[dev], "datalake")
+            h = {kk: pick[kk] for kk in ("host", "input", "output", "cache_read", "cache_creation", "total",
+                                         "unpriced_tokens", "sessions")}
+            h["host"] = h["host"] or dev
+            h["cost_usd_est"] = round(pick["cost_usd_est"], 2)
+            h["source"] = src
+            h["datalake_total"] = a.get(dev, {}).get("total", 0)
+            h["export_total"] = b.get(dev, {}).get("total") if dev in b else None
+            rec["per_host"][dev] = h
+            rec["by_machine"][dev] = {"total": h["total"], "cost_usd_est": h["cost_usd_est"],
+                                      "sessions": h["sessions"], "source": src}
+            for kk in ("input", "output", "cache_read", "cache_creation", "total", "unpriced_tokens", "sessions"):
+                rec[kk] += pick[kk]
+            rec["cost_usd_est"] += pick["cost_usd_est"]
+            for model, m in pick["models"].items():
+                mm = rec["by_model"].setdefault(model, {"total": 0, "cost_usd_est": None})
+                mm["total"] += m["total"]
+                if m["cost_usd_est"] is not None:
+                    mm["cost_usd_est"] = round((mm["cost_usd_est"] or 0.0) + m["cost_usd_est"], 2)
         rec["cost_usd_est"] = round(rec["cost_usd_est"], 2)
-        for m in rec["by_machine"].values():
-            m["cost_usd_est"] = round(m["cost_usd_est"], 2)
-        for m in rec["by_model"].values():
-            if m["cost_usd_est"] is not None:
-                m["cost_usd_est"] = round(m["cost_usd_est"], 2)
         out_days.append(rec)
     newest = max(latest.values()) if latest else None
-    stale = True
-    if newest:
-        t = datetime.fromisoformat(newest.replace("Z", "+00:00"))
-        stale = (datetime.now(timezone.utc) - t) > timedelta(hours=TOKENS_STALE_H)
-    return base | {"days": out_days, "latest_by_machine": latest, "newest": newest,
-                   "stale": stale, "error": None,
-                   "note": "datalake coverage: only sessions the datalake has ingested are counted"}
+    if good:
+        stale = min(m["age_h"] for m in good) > TOKENS_EXPORT_STALE_H
+    else:
+        stale = True
+        if newest:
+            t = datetime.fromisoformat(newest.replace("Z", "+00:00"))
+            stale = (datetime.now(timezone.utc) - t) > timedelta(hours=TOKENS_STALE_H)
+    return base | {"days": out_days, "latest_by_machine": latest, "newest": newest, "exports": meta,
+                   "stale": stale, "error": None, "datalake_error": dl_err,
+                   "note": "per host-day = max(claude-tokens-export file, datalake); exports count subagents too"}

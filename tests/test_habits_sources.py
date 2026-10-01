@@ -19,7 +19,8 @@ ME = "mail.prabhanshu@gmail.com"
 
 
 @pytest.fixture(autouse=True)
-def clear_cache():
+def clear_cache(tmp_path, monkeypatch):
+    monkeypatch.setattr(hs, "TOKENS_EXPORT_DIR", tmp_path / "no-exports")
     hs._cache.clear()
     yield
     hs._cache.clear()
@@ -119,3 +120,65 @@ def test_tokens_per_day_dedup_and_cost(tmp_path):
 def test_tokens_missing_db_is_stale(tmp_path):
     res = hs.tokens(3, now=NOW, db_path=tmp_path / "nope.db")
     assert res["stale"] is True and "not found" in res["error"]
+
+
+def write_export(d, host, device, days, generated=None):
+    import json
+    from datetime import timezone
+    d.mkdir(parents=True, exist_ok=True)
+    gen = generated or datetime.now(timezone.utc).astimezone(TZ)
+    (d / f"{host}.json").write_text(json.dumps({"host": host, "device": device,
+                                                "generated": gen.isoformat(timespec="seconds"), "days": days}))
+
+
+def eday(date, model, i=0, o=0, cr=0, cc=0, sessions=1):
+    m = {"input": i, "output": o, "cache_read": cr, "cache_creation": cc, "total": i + o + cr + cc}
+    return dict(m, date=date, sessions=sessions, models={model: m})
+
+
+def test_tokens_merge_exports_max_per_host_day(tmp_path):
+    p = tmp_path / "datalake.db"
+    make_db(p)
+    ex = tmp_path / "claude-tokens"
+    # laptop export: 09-30 bigger than the datalake's laptop 1 M (subagents) -> export wins;
+    # 09-29 export (7) behind the datalake's laptop 1,001,010 -> datalake wins
+    write_export(ex, "omarchy", "laptop", [eday("2026-09-30", "claude-opus-5-5", cr=5_000_000, sessions=3),
+                                          eday("2026-09-29", "claude-opus-5-5", o=7)])
+    # desktop export behind the datalake on 09-30 -> datalake wins, no double count
+    write_export(ex, "omarchy-desktop", "desktop", [eday("2026-09-30", "claude-opus-5-5", o=100)])
+    res = hs.tokens(3, now=NOW, db_path=p, export_dir=ex)
+    assert res["error"] is None and res["stale"] is False
+    d = {x["date"]: x for x in res["days"]}
+    d30 = d["2026-09-30"]
+    assert d30["per_host"]["laptop"]["source"] == "export"
+    assert d30["per_host"]["laptop"]["host"] == "omarchy"
+    assert d30["per_host"]["laptop"]["total"] == 5_000_000
+    assert d30["per_host"]["laptop"]["datalake_total"] == 1_000_000
+    assert d30["per_host"]["desktop"]["source"] == "datalake"
+    assert d30["per_host"]["desktop"]["total"] == 1_000_500
+    assert d30["total"] == 5_000_000 + 1_000_500
+    assert d30["by_machine"]["laptop"]["total"] == 5_000_000
+    assert d30["sessions"] == 3 + 1
+    assert d30["cost_usd_est"] == pytest.approx(5 * 0.20 + 2.00, abs=0.01)
+    d29 = d["2026-09-29"]
+    assert d29["per_host"]["laptop"]["source"] == "datalake"
+    assert d29["per_host"]["laptop"]["export_total"] == 7
+    assert d29["total"] == 1_001_010 and set(d29["per_host"]) == {"laptop"}
+    assert set(res["exports"]) == {"omarchy", "omarchy-desktop"}
+
+
+def test_tokens_exports_without_datalake_and_staleness(tmp_path):
+    from datetime import timedelta, timezone
+    ex = tmp_path / "claude-tokens"
+    old = datetime.now(timezone.utc).astimezone(TZ) - timedelta(hours=3)
+    write_export(ex, "omarchy", "laptop", [eday("2026-09-30", "claude-fable-5-1", o=1000)], generated=old)
+    (ex / ".omarchy.json.tmp").write_text("{partial")          # in-flight push is ignored
+    res = hs.tokens(3, now=NOW, db_path=tmp_path / "nope.db", export_dir=ex)
+    assert res["error"] is None and "not found" in res["datalake_error"]
+    assert res["stale"] is True                                   # newest export 3 h old
+    d30 = {x["date"]: x for x in res["days"]}["2026-09-30"]
+    assert d30["total"] == 1000 and d30["per_host"]["laptop"]["source"] == "export"
+    hs._cache.clear()
+    write_export(ex, "omarchy-desktop", "desktop", [])           # fresh file -> not stale
+    res = hs.tokens(3, now=NOW, db_path=tmp_path / "nope.db", export_dir=ex)
+    assert res["stale"] is False
