@@ -75,7 +75,19 @@ GET /api/finance/summary   (old keys + week, last_week, delta_pct, balance_serie
 GET /api/finance/wall      (only the wall's fields; fixture: docs/wall-fixtures/finance.json)
 ```
 
-- First successful run looks back 60 days (backfill), later runs 7 days; `--days N` overrides.
+- Query: `from:(<SENDER_HINTS joined by OR>) newer_than:60d -category:promotions` (logged every run,
+  stored as `query` in the state file). On 2026-10-02 it matched 251 ids, all `alerts@hdfcbank.bank.in`.
+- Incremental: every fetched id goes into `finance.db` table `gmail_seen`, so a run lists all matching
+  ids (pages of 50) and only `messages.get`s the unseen ones, inserting each as it is parsed. The state
+  file's `cursor {newest_ms, backfill_done}`: the 60-day backfill repeats (cheaply) until one run
+  finishes it, then runs list `after:<newest_ms - 1 day>`. `--days N` overrides.
+- Quota (fix 2026-10-02): Gmail charges 5 units per `messages.list` and 5 per `messages.get` (full or
+  metadata: same price, so `format=full`). The project's limit is 6,000 units / user / minute.
+  `finance_gmail.QuotaMeter` paces to `FINANCE_GMAIL_UNITS_PER_MINUTE` (5,000) and stops a run cleanly at
+  `FINANCE_GMAIL_UNITS_PER_RUN` (5,000 = ~990 messages); 403 rateLimitExceeded / 429 / 5xx retry after
+  5, 10, 20, 40 s (+jitter), max 5 tries. `counts` = {fetched, parsed, inserted, duplicates,
+  not_a_transaction, skipped_seen, skipped_units, ids_listed, pages, units, rate_limited, error} is
+  written on every run, error or not.
 - Exit codes: 0 synced, **3 = no usable token** (missing / revoked: the unit treats it as success and
   the state file says `no_token: ...`), 1 = anything else (see `journalctl --user -u life-finance-sync`).
 - Body = the `text/plain` part, else `text/html` stripped. The Gmail receive time fixes the

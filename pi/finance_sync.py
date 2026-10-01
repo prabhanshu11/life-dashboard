@@ -11,7 +11,8 @@ Two ways to drive a sync:
    `life-finance-sync.timer`, every 30 min):
    - `scripts/gmail_authorize.py` writes the token file once (and stores it
      in pass at google/gmail-finance-token); `finance_gmail` reads it.
-   - CLI: `uv run python -m pi.finance_sync --days 60` (from the repo root).
+   - CLI: `uv run python -m pi.finance_sync [--days N]` (from the repo root).
+     Incremental + quota-safe: see run_sync and finance_gmail.QuotaMeter.
      Exit 0 = synced, 3 = no usable Gmail token (harmless until consent),
      1 = any other failure. Every run writes the state file
      ~/.local/state/life-dashboard/finance-sync-last.json.
@@ -41,14 +42,16 @@ log = logging.getLogger("finance_sync")
 EXIT_NO_TOKEN = 3
 
 
-def gmail_search_query(days_back: int = 60) -> str:
-    """Build a Gmail search query that matches bank / wallet alert mail.
+def gmail_search_query(days_back: int = 60, after_epoch: int | None = None) -> str:
+    """Gmail search for bank / wallet alert mail from the SENDER_HINTS addresses only.
 
-    Pass this to the Gmail MCP's search tool.
+    `after_epoch` (unix seconds, the incremental cursor) wins over `days_back`.
+    Promotions are excluded: alerts land in Updates/Primary (2026-10-02: all 251
+    matches of 60 days were outside Promotions). Also usable with the Gmail MCP.
     """
-    senders = " OR ".join(f"from:{s}" for s in finance_parsers.SENDER_HINTS)
-    after = (datetime.now() - timedelta(days=days_back)).strftime("%Y/%m/%d")
-    return f"({senders}) after:{after}"
+    senders = " OR ".join(finance_parsers.SENDER_HINTS)
+    window = f"after:{int(after_epoch)}" if after_epoch else f"newer_than:{int(days_back)}d"
+    return f"from:({senders}) {window} -category:promotions"
 
 
 def ingest_message(
@@ -95,46 +98,107 @@ def sync_messages(messages: list[dict]) -> dict:
     }
 
 
-def run_sync(days_back: int | None = None, max_results: int = 200, service=None) -> dict:
-    """Unattended sync: Gmail API -> parsers -> finance.db, then the state file.
+BACKFILL_DAYS = 60
+CURSOR_OVERLAP_S = 86400  # re-list the last day: late-indexed mail is not missed
 
-    days_back=None -> 60 on the first successful run (backfill), else 7.
-    Raises finance_gmail.GmailTokenError when there is no usable token (the
-    state file still records it, so the wall can say "Gmail not connected").
+
+def _query_for(days_back: int | None, cursor: dict) -> tuple[str, int | None]:
+    """(query, days_back): explicit --days wins; else continue the backfill until it
+    completes, then list only mail after the newest internalDate seen (minus a day)."""
+    if days_back is None and cursor.get("backfill_done") and cursor.get("newest_ms"):
+        floor = int(time.time()) - BACKFILL_DAYS * 86400
+        after = max(cursor["newest_ms"] // 1000 - CURSOR_OVERLAP_S, floor)
+        return gmail_search_query(after_epoch=after), None
+    days = days_back or BACKFILL_DAYS
+    return gmail_search_query(days), days
+
+
+def run_sync(days_back: int | None = None, max_results: int | None = None, service=None,
+             meter=None) -> dict:
+    """Unattended, incremental sync: Gmail API -> parsers -> finance.db, then the state file.
+
+    - Lists every matching id (pages of 50, 5 units each), skips ids already in
+      finance_db.gmail_seen, fetches the rest one by one (5 units each) and inserts
+      each as soon as it is parsed, so a stopped run keeps its progress.
+    - Stops cleanly when the per-run unit budget is spent (BudgetExhausted): the
+      next run resumes where this one stopped (seen ids cost no get).
+    - Cursor in the state file: {newest_ms, backfill_done}. The 60-day backfill
+      repeats (cheaply) until one run finishes it; then runs list after newest_ms.
+    - `counts` is written on every run, error or not.
+    Raises finance_gmail.GmailTokenError when there is no usable token, and any
+    non-retryable / retries-exhausted HttpError (partial inserts are kept).
     """
     import finance_gmail
 
     finance_db.init_db()
     prev = finance_db.read_sync_state() or {}
-    if days_back is None:
-        days_back = 7 if prev.get("last_success") else 60
-    query = gmail_search_query(days_back)
+    cursor = dict(prev.get("cursor") or {})
+    query, days = _query_for(days_back, cursor)
+    meter = meter or finance_gmail.QuotaMeter()
     t0 = time.time()
-    state = {"ts": datetime.now().isoformat(timespec="seconds"), "days_back": days_back,
-             "counts": None, "error": None, "last_success": prev.get("last_success")}
+    counts = {"fetched": 0, "parsed": 0, "inserted": 0, "duplicates": 0, "not_a_transaction": 0,
+              "skipped_seen": 0, "skipped_units": 0, "ids_listed": 0, "pages": 0, "units": 0,
+              "rate_limited": 0, "error": None}
+    state = {"ts": datetime.now().isoformat(timespec="seconds"), "days_back": days, "query": query,
+             "counts": counts, "error": None, "complete": False,
+             "last_success": prev.get("last_success"), "cursor": cursor}
+    added_txns: list[dict] = []
+    log.info("finance sync query: %s", query)
     try:
-        messages = _fetch_via_oauth(query, max_results=max_results, service=service)
-        res = sync_messages(messages)
-        counts = {
-            "fetched": len(messages),
-            "parsed": res["added"] + res["duplicate"],
-            "inserted": res["added"],
-            "duplicates": res["duplicate"],
-            "not_a_transaction": res["not_a_transaction"],
-        }
-        state.update(counts=counts, last_success=state["ts"])
-        log.info("finance sync: fetched=%(fetched)d parsed=%(parsed)d inserted=%(inserted)d "
-                 "duplicates=%(duplicates)d not_a_transaction=%(not_a_transaction)d", counts)
-        return {**res, "counts": counts}
+        svc = service or finance_gmail.build_service()
+        stats: dict = {}
+        ids = finance_gmail.list_ids(query, svc, meter, max_ids=max_results, stats=stats)
+        seen = finance_db.seen_ids(ids)
+        todo = [i for i in ids if i not in seen]
+        counts.update(ids_listed=len(ids), pages=stats.get("pages", 0), skipped_seen=len(seen))
+        log.info("finance sync: %d ids matched in %d list pages, %d already seen, %d to fetch "
+                 "(~%d units)", len(ids), counts["pages"], len(seen), len(todo),
+                 len(todo) * finance_gmail.UNITS["get"])
+        for n, mid in enumerate(todo):
+            try:
+                m = finance_gmail.get_message(mid, svc, meter)
+            except finance_gmail.BudgetExhausted as e:
+                counts["skipped_units"] = len(todo) - n
+                counts["error"] = f"budget: {e}; {len(todo) - n} ids left for the next run"
+                log.warning("finance sync stopped on budget: %s", counts["error"])
+                break
+            counts["fetched"] += 1
+            res = ingest_message(m["sender"], m["subject"], m["body"], m["id"], m["internal_ts"])
+            st = res["status"]
+            counts[{"added": "inserted", "duplicate": "duplicates"}.get(st, st)] += 1
+            if st == "added":
+                added_txns.append(res["txn"])
+            finance_db.mark_seen(mid, m.get("internal_ms"), st)
+            if m.get("internal_ms"):
+                cursor["newest_ms"] = max(cursor.get("newest_ms") or 0, m["internal_ms"])
+        else:
+            cursor["backfill_done"] = True
+            state["complete"] = True
+        counts["parsed"] = counts["inserted"] + counts["duplicates"]
+        state["last_success"] = state["ts"]
+        return {"processed": counts["fetched"], "added": counts["inserted"],
+                "duplicate": counts["duplicates"], "not_a_transaction": counts["not_a_transaction"],
+                "added_transactions": added_txns, "synced_at": datetime.now().isoformat(),
+                "counts": counts, "complete": state["complete"]}
     except finance_gmail.GmailTokenError as e:
-        state["error"] = f"no_token: {e}"
+        state["error"] = counts["error"] = f"no_token: {e}"
+        state["counts"] = None if not counts["units"] and not meter.spent else counts
         raise
     except Exception as e:
-        state["error"] = f"{type(e).__name__}: {e}"
+        state["error"] = counts["error"] = f"{type(e).__name__}: {e}"
         raise
     finally:
+        counts["parsed"] = counts["inserted"] + counts["duplicates"]
+        counts["units"] = meter.spent
+        counts["rate_limited"] = meter.rate_limited
+        counts["slept_s"] = round(meter.slept_s, 1)
         state["duration_s"] = round(time.time() - t0, 2)
         _write_state(state)
+        if state["counts"] is not None:
+            log.info("finance sync: fetched=%(fetched)d parsed=%(parsed)d inserted=%(inserted)d "
+                     "duplicates=%(duplicates)d not_a_transaction=%(not_a_transaction)d "
+                     "skipped_seen=%(skipped_seen)d skipped_units=%(skipped_units)d units=%(units)d "
+                     "rate_limited=%(rate_limited)d error=%(error)s", counts)
 
 
 def _write_state(state: dict) -> None:
@@ -145,19 +209,13 @@ def _write_state(state: dict) -> None:
     tmp.replace(path)
 
 
-def _fetch_via_oauth(query: str, max_results: int = 200, service=None) -> list[dict]:
-    """Fetch matching Gmail messages with the stored OAuth token (finance_gmail)."""
-    import finance_gmail
-
-    return finance_gmail.fetch_messages(query, max_results=max_results, service=service)
-
-
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m pi.finance_sync",
                                  description="Pull bank-alert mail from Gmail into finance.db")
     ap.add_argument("--days", type=int, default=None,
-                    help="look back N days (default: 60 on first success, then 7)")
-    ap.add_argument("--max", type=int, default=200, help="max messages per run")
+                    help="look back N days (default: 60-day backfill until complete, then the cursor)")
+    ap.add_argument("--max", type=int, default=None,
+                    help="max message ids per run (default: none; the unit budget caps a run)")
     ap.add_argument("--query", action="store_true", help="print the Gmail query and exit")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")

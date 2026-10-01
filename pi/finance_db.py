@@ -52,6 +52,14 @@ def init_db() -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_txn_ts ON transactions(ts);
         CREATE INDEX IF NOT EXISTS idx_txn_source ON transactions(source);
+        -- every Gmail message the poller has fetched + parsed (transaction or not),
+        -- so a resumed / incremental run never pays for the same messages.get twice
+        CREATE TABLE IF NOT EXISTS gmail_seen (
+            email_id    TEXT PRIMARY KEY,
+            internal_ms INTEGER,                 -- Gmail internalDate (ms)
+            status      TEXT,                    -- added | duplicate | not_a_transaction
+            seen_at     TEXT DEFAULT (datetime('now'))
+        );
         """
     )
     conn.commit()
@@ -198,6 +206,30 @@ def _record_balance(account: str, balance: float, ts: str) -> None:
              balance=excluded.balance, last_updated=excluded.last_updated
            WHERE accounts.last_updated IS NULL OR excluded.last_updated >= accounts.last_updated""",
         (account, type_, balance, ts),
+    )
+    conn.commit()
+    conn.close()
+
+
+def seen_ids(ids: list[str]) -> set[str]:
+    """The subset of Gmail ids the poller already fetched and parsed."""
+    if not ids:
+        return set()
+    conn = _conn()
+    out: set[str] = set()
+    for i in range(0, len(ids), 500):
+        chunk = ids[i:i + 500]
+        q = f"SELECT email_id FROM gmail_seen WHERE email_id IN ({','.join('?' * len(chunk))})"
+        out |= {r[0] for r in conn.execute(q, chunk)}
+    conn.close()
+    return out
+
+
+def mark_seen(email_id: str, internal_ms: int | None, status: str) -> None:
+    conn = _conn()
+    conn.execute(
+        "INSERT OR REPLACE INTO gmail_seen (email_id, internal_ms, status) VALUES (?, ?, ?)",
+        (email_id, internal_ms, status),
     )
     conn.commit()
     conn.close()
