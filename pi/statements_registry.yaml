@@ -29,7 +29,7 @@ sources:
     folder: hdfc_savings
     password:
       pass_entry: finance/statements/hdfc_savings
-      hint: "HDFC Customer ID (the number you log in to NetBanking with)"
+      hint: "your HDFC Customer ID (confirmed by the statement mail: 'Enter your Customer ID as the password')"
       needed: true
     parser: hdfc_savings
 
@@ -87,7 +87,7 @@ sources:
     folder: zerodha
     password:
       pass_entry: finance/statements/zerodha
-      hint: "PAN in CAPITALS (ABCDE1234F)"
+      hint: "PAN in CAPITALS, e.g. ABCDE1234F (confirmed by the Zerodha mail)"
       needed: true
     parser: null
 
@@ -123,8 +123,8 @@ sources:
     folder: jio
     password:
       pass_entry: finance/statements/jio
-      hint: "unknown (Jio bills are usually open)"
-      needed: unknown
+      hint: "first 4 letters of the connection's registered name in lower case + last 4 digits of the Jio number, e.g. rame7007 (confirmed by the bill mail)"
+      needed: true
     parser: null
 
   - id: airtel
