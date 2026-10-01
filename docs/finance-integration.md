@@ -29,6 +29,9 @@ once the DB has any rows.
 - `iobalerts@iob.in`, `noreply@iob.in`, `iobalerts@iob.bank.in` (Indian Overseas Bank; `.bank.in` = the RBI bank domain move, unverified against his inbox)
 - `noreply@swiggy.in`, `no-reply@swiggy.in`
 - `noreply@blinkit.com`, `order-update@blinkit.com`
+- Orders (lane orders-1002): `noreply@zomato.com`, `auto-confirm@amazon.in`, `order-update@amazon.in`,
+  `shipment-tracking@amazon.in`, `return@amazon.in`, `payments-messages@amazon.in` (see "Orders" below).
+  Changing `SENDER_HINTS` re-opens the 60-day backfill once (cursor `senders` signature).
 
 Add a new sender by:
 1. Adding to `_DISPATCH` in `finance_parsers.py` with a matcher lambda.
@@ -121,12 +124,60 @@ Google Cloud Console, signed in as mail.prabhanshu@gmail.com:
 After that the next timer run (or `systemctl --user start life-finance-sync.service`) backfills 60
 days and the wall's FINANCE slide shows real numbers.
 
+## Orders (Zomato, Swiggy, Amazon, Blinkit) — lane orders-1002, 2026-10-02
+
+His words: "incorporate swiggy, zomato, amaon orders also".
+
+Sender discovery, 120 days to 2026-10-02 (headers only, all in Gmail's Updates tab):
+
+| Brand | Sender | Subjects (count) | Used |
+|---|---|---|---|
+| Zomato | `noreply@zomato.com` | "Your Zomato order from <restaurant>" (4, one per order, sent on delivery; ORDER ID, items, "Total paid") | yes |
+| Zomato | `noreply@mailers.zomato.com` | marketing (21); plus Gold welcome + login alert from `noreply@zomato.com` (2) | no |
+| Swiggy / Instamart / Dineout | none | 0 mails from any swiggy address; "swiggy" appears only in HDFC card alerts (14) | card rows |
+| Blinkit / Zepto | none | 0 mails; Blinkit appears only in HDFC card alerts (15) | card rows |
+| Amazon | `auto-confirm@amazon.in` | "Ordered: ..." (24; Order #, items, "Total N INR") | yes |
+| Amazon | `shipment-tracking@amazon.in` | Shipped (30), Out for delivery (17), Arriving Today OTP (12) | status |
+| Amazon | `order-update@amazon.in` | Delivered (25), Problem during delivery / attempted (13), Item cancelled (1), Amazon Fresh (3) | status |
+| Amazon | `return@amazon.in` | "Your refund for ..." (4), "Your return of" (1), Replacement (1) | refunds |
+| Amazon | `payments-messages@amazon.in` | "Refund on order <id>" (1) | refunds |
+| Amazon | `no-reply@amazon.in`, `account-update@`, `services@` | return surveys, sign-in, warranty (10) | no |
+| Amazon Pay | `no-reply@amazonpay.in` | "Rs N was paid on Amazon.in" (9, Amazon Pay balance), refund / cashback (16) | not yet |
+
+**One ledger row per order.** `finance_db.orders` keeps one row per order (`source:order_id`) and per
+refund (`source:order_id:refund:<rupees>`). The first mail with an amount makes the money count; every
+later mail (shipped, delivered, cancelled) only updates `order_status` / `items`. The order's time is its
+earliest mail, `ts_last` its latest. Cancelled before it was paid for -> nothing counts (and refunds of it
+are ignored). Refund mails make a CREDIT row with the order's category.
+
+**No double counting with the bank (the link rule, `finance_db.link_counterpart`).** An order (or refund)
+and a bank/card row (`hdfc`, `hdfc_cc`, `iob`, `statement`) are the same money when: same direction,
+amounts within 1 rupee, the bank row within 2 days of the order's mail span (placed .. last shipment /
+delivery mail; Amazon charges the card on dispatch), the bank row has no `matched_email_id` yet, and the
+bank row does not name a different brand (an Amazon order never takes a SWIGGY card row). Closest brand
+match, then amount, then time wins. Linked -> the bank row gets `merchant`, `items`, `category`,
+`order_id`, `order_status`, `payment` and `matched_email_id` (the order mail) and no order row exists.
+Not linked (COD, Amazon Pay balance, wallet, a card without alerts) -> a `source='order'` row counts it.
+The same function runs after an order row is inserted AND after a bank alert / statement row is inserted,
+so the arrival order does not matter; `relink_orders()` retries the standing order rows after every sync.
+Payments marked `amazon_pay_balance` / `wallet` never link.
+
+Also fixed on the way: HDFC card alerts now read the merchant from "towards X on" / "From Merchant: X"
+and treat "transaction reversal" as a CREDIT (before: every reversal counted as spend). Rows stored
+before the fix are repaired on every sync (`repair_card_rows`, only rows with no merchant).
+
+**Wall / summary.** `/api/finance/summary` and `/api/finance/wall` carry
+`orders: {week: {food, groceries, shopping, n}, last_week: {...}, top_merchants_week: [{merchant, total, n}],
+linked_to_bank, order_rows}`: rolling 7 days, order-linked rows plus card rows that name a brand (Swiggy,
+Blinkit send no mail), net of refunds. `top_categories_week` picks up the enriched categories.
+
 ## Categorisation
 
 Categories are inferred from the merchant string + body text by simple regex
 rules in `finance_parsers._CATEGORY_RULES`:
-`salary · rent · food · groceries · shopping · bills · fuel · transport ·
-cash · transfer · uncategorised`. Tune rules as needed — the data shape is
+`salary · rent · groceries · food · shopping · bills · fuel · transport ·
+cash · transfer · uncategorised` (groceries is tried before food so "Swiggy Instamart" is groceries;
+card reversals are `refund`). Tune rules as needed — the data shape is
 stable, only the regexes change.
 
 ## Reset / debug

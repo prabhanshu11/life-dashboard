@@ -68,8 +68,16 @@ def ingest_message(
     txn = finance_parsers.parse_email(sender, subject, body, email_id, received_at)
     if txn is None:
         return {"status": "not_a_transaction", "email_id": email_id}
+    if txn.get("source") in finance_parsers.ORDER_SOURCES:
+        # one ledger row per order: added | linked (into a bank row) | updated | recorded | duplicate
+        result = finance_db.ingest_order(txn)
+        return {"status": result["status"], "key": result.get("key"), "txn": txn}
     result = finance_db.add_transaction(**txn)
-    return {"status": result["status"], "id": result["id"], "txn": txn}
+    linked = False
+    if result["status"] == "added":
+        # symmetric half of the order<->bank rule: an order row may already be waiting for this alert
+        linked = finance_db.link_counterpart(result["id"])["linked"]
+    return {"status": result["status"], "id": result["id"], "txn": txn, "linked": linked}
 
 
 def sync_messages(messages: list[dict]) -> dict:
@@ -102,9 +110,19 @@ BACKFILL_DAYS = 60
 CURSOR_OVERLAP_S = 86400  # re-list the last day: late-indexed mail is not missed
 
 
+def senders_signature() -> str:
+    """Changes whenever SENDER_HINTS changes: a new sender gets its own 60-day backfill."""
+    import hashlib
+    return hashlib.sha1(" ".join(sorted(finance_parsers.SENDER_HINTS)).encode()).hexdigest()[:12]
+
+
 def _query_for(days_back: int | None, cursor: dict) -> tuple[str, int | None]:
     """(query, days_back): explicit --days wins; else continue the backfill until it
-    completes, then list only mail after the newest internalDate seen (minus a day)."""
+    completes, then list only mail after the newest internalDate seen (minus a day).
+    A changed sender list (cursor 'senders' != senders_signature()) re-opens the backfill;
+    ids already in gmail_seen cost only their share of the list call."""
+    if cursor.get("backfill_done") and cursor.get("senders") != senders_signature():
+        cursor["backfill_done"] = False
     if days_back is None and cursor.get("backfill_done") and cursor.get("newest_ms"):
         floor = int(time.time()) - BACKFILL_DAYS * 86400
         after = max(cursor["newest_ms"] // 1000 - CURSOR_OVERLAP_S, floor)
@@ -137,6 +155,8 @@ def run_sync(days_back: int | None = None, max_results: int | None = None, servi
     meter = meter or finance_gmail.QuotaMeter()
     t0 = time.time()
     counts = {"fetched": 0, "parsed": 0, "inserted": 0, "duplicates": 0, "not_a_transaction": 0,
+              "orders_added": 0, "orders_linked": 0, "order_updates": 0, "orders_recorded": 0,
+              "alerts_linked": 0, "cards_repaired": 0, "relinked": 0,
               "skipped_seen": 0, "skipped_units": 0, "ids_listed": 0, "pages": 0, "units": 0,
               "rate_limited": 0, "error": None}
     state = {"ts": datetime.now().isoformat(timespec="seconds"), "days_back": days, "query": query,
@@ -149,7 +169,9 @@ def run_sync(days_back: int | None = None, max_results: int | None = None, servi
         stats: dict = {}
         ids = finance_gmail.list_ids(query, svc, meter, max_ids=max_results, stats=stats)
         seen = finance_db.seen_ids(ids)
+        # (newest first, as listed: ingest_order is arrival-order independent, see tests)
         todo = [i for i in ids if i not in seen]
+        counts["cards_repaired"] = finance_db.repair_card_rows()
         counts.update(ids_listed=len(ids), pages=stats.get("pages", 0), skipped_seen=len(seen))
         log.info("finance sync: %d ids matched in %d list pages, %d already seen, %d to fetch "
                  "(~%d units)", len(ids), counts["pages"], len(seen), len(todo),
@@ -165,16 +187,27 @@ def run_sync(days_back: int | None = None, max_results: int | None = None, servi
             counts["fetched"] += 1
             res = ingest_message(m["sender"], m["subject"], m["body"], m["id"], m["internal_ts"])
             st = res["status"]
-            counts[{"added": "inserted", "duplicate": "duplicates"}.get(st, st)] += 1
-            if st == "added":
-                added_txns.append(res["txn"])
+            if res.get("key"):  # an order mail
+                k = {"added": "orders_added", "linked": "orders_linked", "updated": "order_updates",
+                     "recorded": "orders_recorded", "duplicate": "duplicates"}.get(st, st)
+                counts[k] = counts.get(k, 0) + 1
+                counts["inserted"] += st == "added"  # a new ledger row, like an alert
+                if st in ("added", "linked"):
+                    added_txns.append(res["txn"])
+            else:
+                counts[{"added": "inserted", "duplicate": "duplicates"}.get(st, st)] += 1
+                counts["alerts_linked"] += bool(res.get("linked"))
+                if st == "added":
+                    added_txns.append(res["txn"])
             finance_db.mark_seen(mid, m.get("internal_ms"), st)
             if m.get("internal_ms"):
                 cursor["newest_ms"] = max(cursor.get("newest_ms") or 0, m["internal_ms"])
         else:
             cursor["backfill_done"] = True
+            cursor["senders"] = senders_signature()
             state["complete"] = True
-        counts["parsed"] = counts["inserted"] + counts["duplicates"]
+        counts["relinked"] = finance_db.relink_orders()
+        counts["parsed"] = _parsed(counts)
         state["last_success"] = state["ts"]
         return {"processed": counts["fetched"], "added": counts["inserted"],
                 "duplicate": counts["duplicates"], "not_a_transaction": counts["not_a_transaction"],
@@ -188,7 +221,7 @@ def run_sync(days_back: int | None = None, max_results: int | None = None, servi
         state["error"] = counts["error"] = f"{type(e).__name__}: {e}"
         raise
     finally:
-        counts["parsed"] = counts["inserted"] + counts["duplicates"]
+        counts["parsed"] = _parsed(counts)
         counts["units"] = meter.spent
         counts["rate_limited"] = meter.rate_limited
         counts["slept_s"] = round(meter.slept_s, 1)
@@ -197,8 +230,16 @@ def run_sync(days_back: int | None = None, max_results: int | None = None, servi
         if state["counts"] is not None:
             log.info("finance sync: fetched=%(fetched)d parsed=%(parsed)d inserted=%(inserted)d "
                      "duplicates=%(duplicates)d not_a_transaction=%(not_a_transaction)d "
+                     "orders_added=%(orders_added)d orders_linked=%(orders_linked)d "
+                     "order_updates=%(order_updates)d alerts_linked=%(alerts_linked)d "
+                     "cards_repaired=%(cards_repaired)d relinked=%(relinked)d "
                      "skipped_seen=%(skipped_seen)d skipped_units=%(skipped_units)d units=%(units)d "
                      "rate_limited=%(rate_limited)d error=%(error)s", counts)
+
+
+def _parsed(c: dict) -> int:
+    return (c["inserted"] + c["duplicates"] + c.get("orders_linked", 0) + c.get("order_updates", 0)
+            + c.get("orders_recorded", 0))
 
 
 def _write_state(state: dict) -> None:

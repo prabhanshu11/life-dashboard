@@ -317,5 +317,33 @@
   },
   "last_sync": "2026-10-02T07:10:41",
   "error": null
+ },
+ "orders": {
+  "week": {
+   "food": 801.59,
+   "groceries": 0.0,
+   "shopping": 4303.98,
+   "n": 2
+  },
+  "last_week": {
+   "food": 0.0,
+   "groceries": 0.0,
+   "shopping": 0.0,
+   "n": 0
+  },
+  "top_merchants_week": [
+   {
+    "merchant": "Amazon",
+    "total": 4303.98,
+    "n": 1
+   },
+   {
+    "merchant": "Zomato · Example Restaurant",
+    "total": 801.59,
+    "n": 1
+   }
+  ],
+  "linked_to_bank": 1,
+  "order_rows": 1
  }
 }

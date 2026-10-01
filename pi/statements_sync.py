@@ -295,6 +295,8 @@ def ingest_rows(statement_id: int, sha: str, source_id: str, parsed: dict) -> di
                     email_id=key, raw_snippet=f"statement {source_id}: {narr}"[:280])
                 txn_id = res["id"]
                 c["inserted"] += res["status"] == "added"
+                if res["status"] == "added":  # an order row (Amazon / Zomato mail) may be this money
+                    txn_id = finance_db.link_counterpart(txn_id)["id"]
         _exec("INSERT OR IGNORE INTO statement_rows (key, statement_id, row_n, ts, amount, direction, narration,"
               " matched_email_id, txn_id) VALUES (?,?,?,?,?,?,?,?,?)",
               (key, statement_id, n, row["date"], row["amount"], row["direction"],

@@ -99,8 +99,8 @@ def _date(text: str, fallback: datetime | None = None) -> str:
 _CATEGORY_RULES = [
     ("salary",    r"salary|payroll|stipend|wages"),
     ("rent",      r"\brent\b|housing|landlord|maintenance charge"),
-    ("food",      r"swiggy|zomato|restaurant|cafe|eatery|domino|pizza|kfc|mcdonald|food"),
-    ("groceries", r"blinkit|bigbasket|zepto|grocery|dmart|instamart|grofers"),
+    ("groceries", r"blinkit|bigbasket|zepto|grocery|dmart|instamart|grofers|amazon fresh"),
+    ("food",      r"swiggy|zomato|eternal|restaurant|cafe|eatery|domino|pizza|kfc|mcdonald|food"),
     ("shopping",  r"amazon|flipkart|myntra|ajio|nykaa|meesho|store|mall"),
     ("bills",     r"electricity|recharge|broadband|airtel|jio|gas|bill|insurance|dth|emi|loan"),
     ("fuel",      r"petrol|fuel|hpcl|iocl|bpcl|indianoil|shell"),
@@ -144,21 +144,32 @@ def parse_hdfc(sender: str, subject: str, body: str) -> dict | None:
 
 
 def parse_hdfc_cc(sender: str, subject: str, body: str) -> dict | None:
-    """HDFC Bank credit-card spend alerts."""
+    """HDFC Bank credit-card spend alerts (and reversals / refunds, which are credits).
+
+    Live forms (2026-09): "Rs. 2504.00 has been debited from your HDFC Bank Credit Card ending
+    4089 towards AMAZON on 07 Sep, 2026 at 10:37:35" and "A transaction reversal of Rs. 654.00
+    has been initiated to your HDFC Bank Credit Card ending 4089 From Merchant: AMAZON".
+    """
     amt = _amount(body) or _amount(subject)
     if amt is None:
         return None
     tail = _CARD_TAIL.search(body)
-    # merchant: "at <MERCHANT> on <date>"
-    m = re.search(r"\bat\s+([\w .&'*\-]{2,45}?)\s+on\b", body, re.I)
-    merchant = m.group(1).strip() if m else None
+    merchant = None
+    for rx in (r"\btowards\s+([\w .&'*\-]{2,45}?)\s+on\s+\d",
+               r"From\s+Merchant\s*:\s*([\w .&'*\-]{2,45}?)\s*(?:\n|Date|$)",
+               r"\bat\s+([\w .&'*\-]{2,45}?)\s+on\b"):
+        m = re.search(rx, body, re.I)
+        if m:
+            merchant = m.group(1).strip()
+            break
+    credit = re.search(r"\b(reversal|refund(?:ed)?|credited to your)\b", f"{subject} {body}", re.I)
     return {
         "ts": _date(body),
         "amount": amt,
-        "direction": "debit",
+        "direction": "credit" if credit else "debit",
         "account": f"HDFC CC{(' ' + tail.group(1)) if tail else ''}".strip(),
         "merchant": merchant,
-        "category": infer_category(merchant, body),
+        "category": "refund" if credit else infer_category(merchant, body),
         "source": "hdfc_cc",
     }
 
@@ -183,47 +194,182 @@ def parse_iob(sender: str, subject: str, body: str) -> dict | None:
     }
 
 
-def parse_swiggy(sender: str, subject: str, body: str) -> dict | None:
-    """Swiggy order-confirmation / delivery emails."""
-    # Prefer an explicit total/bill/paid line, else any amount
-    m = re.search(
-        r"(?:total|bill|paid|amount|grand total)[^\d₹]{0,20}"
-        r"(?:Rs\.?|INR|₹)\s*([\d,]+(?:\.\d{1,2})?)",
-        body, re.I,
-    )
-    amt = float(m.group(1).replace(",", "")) if m else _amount(body)
-    if amt is None:
+# ── order parsers (Zomato, Swiggy, Amazon, Blinkit) ──────────────────────────
+# Contract (beyond the bank parsers' keys): kind 'order' | 'status' | 'refund', order_id,
+# items (short text), status (ordered/shipped/out_for_delivery/delivered/cancelled/refunded),
+# payment (upi/card/cod/amazon_pay_balance/wallet or None). `amount` may be None on a
+# status mail. finance_db.ingest_order() turns these into ONE ledger row per order.
+ORDER_SOURCES = ("zomato", "swiggy", "amazon", "blinkit")
+_MONEY = r"(?:₹|Rs\.?|INR)\s*([\d,]+(?:\.\d{1,2})?)"
+
+
+def _money(rx: str, text: str) -> float | None:
+    m = re.search(rx, text, re.I)
+    if not m:
         return None
+    try:
+        return float(m.group(1).replace(",", ""))
+    except ValueError:
+        return None
+
+
+def _payment(text: str) -> str | None:
+    t = text.lower()
+    if re.search(r"amazon pay balance|gift card balance|refund gift card", t):
+        return "amazon_pay_balance"
+    if re.search(r"cash on delivery|\bcod\b|pay on delivery", t):
+        return "cod"
+    if re.search(r"\bupi\b", t):
+        return "upi"
+    if re.search(r"credit card|debit card|dinersclub|diners club|\bcard\b", t):
+        return "card"
+    if re.search(r"\bwallet\b|swiggy money|zomato money", t):
+        return "wallet"
+    return None
+
+
+def _short(text: str, n: int = 60) -> str:
+    text = re.sub(r"\s+", " ", text or "").strip(" -|*")
+    return text if len(text) <= n else text[: n - 1].rstrip() + "…"
+
+
+def _order(source, account, merchant, category, kind, order_id, amount, status,
+           items=None, payment=None, direction=None) -> dict:
     return {
-        "ts": _date(body),
-        "amount": amt,
-        "direction": "debit",
-        "account": "Swiggy",
-        "merchant": "Swiggy",
-        "category": "food",
-        "source": "swiggy",
+        "ts": datetime.now().isoformat(), "amount": amount,
+        "direction": direction or ("credit" if kind == "refund" else "debit"),
+        "account": account, "merchant": merchant, "category": category, "source": source,
+        "kind": kind, "order_id": order_id, "items": items, "status": status, "payment": payment,
     }
+
+
+def parse_zomato(sender: str, subject: str, body: str) -> dict | None:
+    """Zomato order mail (noreply@zomato.com, one per order, sent on delivery):
+    "Your Zomato order from <restaurant>" ... "ORDER ID: 8665147729" ... "1 X <item>" ...
+    "Total paid - ₹801.59". Marketing (mailers.zomato.com), Gold, login mails -> None."""
+    text = f"{subject} {body}"
+    oid = re.search(r"ORDER\s*ID\s*[:#-]?\s*(\d{6,})", text, re.I)
+    if not oid:
+        return None
+    m = re.search(r"order from\s+(.+?)\s*$", subject or "", re.I)
+    restaurant = _short(m.group(1), 40) if m else None
+    items = re.findall(r"\b(\d+)\s*[xX]\s+(.+?)(?=\s+\d+\s*[xX]\s|\s+(?:Total|Item total|Taxes|Delivery)\b|$)", body)
+    items_s = _short(", ".join(f"{q}x {_short(n, 30)}" for q, n in items[:4])) if items else None
+    t = text.lower()
+    refund = re.search(r"\brefund", t)
+    amount = (_money(r"(?:refund(?:ed)?(?: of| amount)?)[^\d₹]{0,25}" + _MONEY, text) if refund else None) \
+        or _money(r"Total\s+paid\s*[-:]?\s*" + _MONEY, text) or _money(r"(?:Grand\s+)?Total[^\d₹]{0,20}" + _MONEY, text)
+    status = ("refunded" if refund else "cancelled" if re.search(r"cancel", t)
+              else "delivered" if re.search(r"\bdelivered\b", t) else "ordered")
+    merchant = f"Zomato · {restaurant}" if restaurant else "Zomato"
+    return _order("zomato", "Zomato", merchant, "food", "refund" if refund else "order",
+                  oid.group(1), amount, status, items_s, _payment(text))
+
+
+def parse_swiggy(sender: str, subject: str, body: str) -> dict | None:
+    """Swiggy / Instamart / Dineout order mail. 2026-10-02: no Swiggy mail at all in 120 days
+    (Swiggy spends reach the ledger only as HDFC card alerts "towards SWIGGY ..."), so this is
+    written against the common Swiggy layout and the synthetic tests only."""
+    text = f"{subject} {body}"
+    oid = re.search(r"Order\s*(?:ID|No\.?|Number|#)\s*[:#-]?\s*#?\s*(\d{6,})", text, re.I)
+    t = text.lower()
+    if not oid and not re.search(r"order", t):
+        return None  # no order id and not about an order: a mail without one is keyed by its mail id
+    if "instamart" in t:
+        brand, category = "Swiggy Instamart", "groceries"
+    elif "dineout" in t:
+        brand, category = "Swiggy Dineout", "food"
+    else:
+        brand, category = "Swiggy", "food"
+    m = re.search(r"(?:order from|from)\s+([A-Z][\w .&'’-]{2,40}?)(?:\s+(?:has|is|was|will)\b|\s*[|.,!]|$)", subject or "")
+    place = _short(m.group(1), 40) if m and "swiggy" not in m.group(1).lower() else None
+    items = re.findall(r"\b(\d+)\s*[xX]\s+(.+?)(?=\s+\d+\s*[xX]\s|\s+(?:Item Total|Total|Bill|Taxes|Delivery)\b|$)", body)
+    items_s = _short(", ".join(f"{q}x {_short(n, 30)}" for q, n in items[:4])) if items else None
+    refund = re.search(r"\brefund", t)
+    amount = (_money(r"refund(?:ed)?(?: of| amount)?[^\d₹]{0,25}" + _MONEY, text) if refund else None) \
+        or _money(r"(?:Grand\s+Total|Order\s+Total|Total\s+Paid|Paid|Bill\s+Total|Total)[^\d₹]{0,20}" + _MONEY, text)
+    status = ("refunded" if refund else "cancelled" if re.search(r"cancel", t)
+              else "delivered" if re.search(r"\bdelivered\b", t) else "ordered")
+    if amount is None and not oid:
+        return None
+    return _order("swiggy", "Swiggy", f"{brand} · {place}" if place else brand, category,
+                  "refund" if refund else "order", oid.group(1) if oid else None, amount, status, items_s,
+                  _payment(text))
+
+
+_AMZ_ID = re.compile(r"\b(\d{3}-\d{7}-\d{7})\b")
+_AMZ_STATUS = [  # subject prefix -> status (None = mail carries no order state worth keeping)
+    (r"^ordered\b|thanks for your order", "ordered"),
+    (r"^shipped\b", "shipped"),
+    (r"^out for delivery|is out for delivery", "out_for_delivery"),
+    (r"^delivered\b|has been delivered", "delivered"),
+    (r"cancelled|canceled|could not be delivered", "cancelled"),
+]
+
+
+def parse_amazon(sender: str, subject: str, body: str) -> dict | None:
+    """Amazon.in order mail. Live forms (2026-09, headers in docs/finance-integration.md):
+    auto-confirm@ "Ordered: ..." (Order # 408-..., "Total 4303.98 INR"), shipment-tracking@
+    "Shipped:" / "Out for delivery:", order-update@ "Delivered:" / "Item cancelled successfully" /
+    Amazon Fresh "... could not be delivered" ("Order total: ₹2,043.00"), return@ "Your refund for
+    ..." ("Total refund* ₹4,298.98") and payments-messages@ "Refund on order <id>" ("refund for
+    ₹654.00 ... credited as follows: DinersClub Credit Card")."""
+    text = f"{subject} {body}"
+    oid = _AMZ_ID.search(text)
+    if not oid:
+        return None
+    sub = (subject or "").strip().lower()
+    fresh = "amazon fresh" in text.lower()
+    merchant, category = ("Amazon Fresh", "groceries") if fresh else ("Amazon", "shopping")
+    items = re.findall(r"\*\s+(.+?)\s+Quantity:\s*(\d+)", body)
+    more = re.search(r"and\s+(\d+)\s+more\s+items?", subject or "", re.I)
+    items_s = None
+    if items:
+        items_s = _short(items[0][0].split(" | ")[0], 50) + (f" +{len(items) - 1} more" if len(items) > 1 else "")
+    elif re.search(r"[\"“](.+?)[\"”]", subject or ""):
+        items_s = _short(re.search(r"[\"“](.+?)[\"”]", subject).group(1).rstrip(". "), 50)
+    if items_s and more and "more" not in items_s:
+        items_s += f" +{more.group(1)} more"
+    if re.search(r"^your refund|^refund on order|refund (?:issued|processed|initiated)", sub):
+        amount = _money(r"Total refund\*?\s*" + _MONEY, text) or _money(r"refund (?:for|of)\s*" + _MONEY, text)
+        if amount is None:
+            return None
+        m = re.search(r"credited as follows:\s*(.{0,60})", body, re.I)
+        pay = _payment(m.group(1)) if m else _payment(text)
+        it = re.search(r"Item:\s*(.+?)\s+Quantity:", body)
+        return _order("amazon", "Amazon", merchant, category, "refund", oid.group(1), amount, "refunded",
+                      items_s or (_short(it.group(1), 50) if it else None), pay)
+    status = None
+    for rx, st in _AMZ_STATUS:
+        if re.search(rx, sub):
+            status = st
+            break
+    if fresh and status is None and re.search(r"order total", text, re.I):
+        status = "ordered"
+    if status is None:
+        return None  # "Problem during delivery", OTP, return surveys, enquiries: no order state
+    amount = None
+    if status in ("ordered", "shipped") or fresh:
+        amount = (_money(r"\bTotal\s+([\d,]+(?:\.\d{1,2})?)\s*INR", text)
+                  or _money(r"Order\s+total\s*:?\s*" + _MONEY, text) or _money(r"\bTotal\s*:?\s*" + _MONEY, text))
+    kind = "order" if status == "ordered" else "status"
+    return _order("amazon", "Amazon", merchant, category, kind, oid.group(1), amount, status, items_s,
+                  _payment(text))
 
 
 def parse_blinkit(sender: str, subject: str, body: str) -> dict | None:
-    """Blinkit order-confirmation / delivery emails."""
-    m = re.search(
-        r"(?:total|bill|paid|amount|grand total)[^\d₹]{0,20}"
-        r"(?:Rs\.?|INR|₹)\s*([\d,]+(?:\.\d{1,2})?)",
-        body, re.I,
-    )
-    amt = float(m.group(1).replace(",", "")) if m else _amount(body)
-    if amt is None:
+    """Blinkit order mail. 2026-10-02: none in 120 days (Blinkit spends arrive as HDFC alerts)."""
+    text = f"{subject} {body}"
+    oid = re.search(r"Order\s*(?:ID|No\.?|#)\s*[:#-]?\s*#?\s*([A-Z0-9]{6,})", text, re.I)
+    amount = _money(r"(?:Grand\s+Total|Bill\s+Total|Total|Paid|Amount)[^\d₹]{0,20}" + _MONEY, text) or _amount(body)
+    if amount is None and not oid:
         return None
-    return {
-        "ts": _date(body),
-        "amount": amt,
-        "direction": "debit",
-        "account": "Blinkit",
-        "merchant": "Blinkit",
-        "category": "groceries",
-        "source": "blinkit",
-    }
+    t = text.lower()
+    refund = re.search(r"\brefund", t)
+    status = ("refunded" if refund else "cancelled" if "cancel" in t
+              else "delivered" if re.search(r"\bdelivered\b", t) else "ordered")
+    return _order("blinkit", "Blinkit", "Blinkit", "groceries", "refund" if refund else "order",
+                  oid.group(1) if oid else None, amount, status, None, _payment(text))
 
 
 # ── dispatcher ───────────────────────────────────────────────────────────────
@@ -234,6 +380,8 @@ _DISPATCH = [
     ("iob",     lambda s, sub, b: "iob.in" in s or "iob.co.in" in s or "iob.bank.in" in s or "indianoverseasbank" in s),
     ("swiggy",  lambda s, sub, b: "swiggy" in s),
     ("blinkit", lambda s, sub, b: "blinkit" in s or "grofers" in s),
+    ("zomato",  lambda s, sub, b: "zomato" in s and "mailers." not in s),
+    ("amazon",  lambda s, sub, b: re.search(r"@amazon\.in\b", s) is not None),
 ]
 _PARSERS = {
     "hdfc": parse_hdfc,
@@ -241,6 +389,8 @@ _PARSERS = {
     "iob": parse_iob,
     "swiggy": parse_swiggy,
     "blinkit": parse_blinkit,
+    "zomato": parse_zomato,
+    "amazon": parse_amazon,
 }
 
 
@@ -263,6 +413,11 @@ def parse_email(
     for key, match in _DISPATCH:
         if match(sender_l, subject, body):
             txn = _PARSERS[key](sender_l, subject, body)
+            if txn and key in ORDER_SOURCES:
+                txn["ts"] = received_at or txn["ts"]
+                txn["email_id"] = email_id
+                txn["raw_snippet"] = f"{subject[:120]} — order {txn.get('order_id')}"[:280]
+                return txn
             if txn:
                 if received_at:
                     if not _has_date(body):
@@ -286,6 +441,11 @@ SENDER_HINTS = [
     "iobalerts@iob.in", "noreply@iob.in", "iobalerts@iob.bank.in",
     "noreply@swiggy.in", "no-reply@swiggy.in",
     "noreply@blinkit.com", "order-update@blinkit.com",
+    # orders (discovery 2026-10-02, 120 days, headers only; table in docs/finance-integration.md).
+    # NOT noreply@mailers.zomato.com: that is Zomato marketing, the order mails come from noreply@zomato.com.
+    "noreply@zomato.com",
+    "auto-confirm@amazon.in", "order-update@amazon.in", "shipment-tracking@amazon.in",
+    "return@amazon.in", "payments-messages@amazon.in",
 ]
 
 
