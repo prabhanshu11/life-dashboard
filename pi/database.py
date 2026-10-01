@@ -94,6 +94,12 @@ def init_db():
             )
         """)
 
+        # habit_logs.source (2026-10-01, habits-feed-1001): 'manual' = his tap,
+        # 'camera' = auto-logged from the camera timeline. Safe additive migration.
+        cols = [r[1] for r in cursor.execute("PRAGMA table_info(habit_logs)").fetchall()]
+        if "source" not in cols:
+            cursor.execute("ALTER TABLE habit_logs ADD COLUMN source TEXT DEFAULT 'manual'")
+
         # Create skill_learnings table for self-improving skill
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS skill_learnings (
@@ -372,7 +378,9 @@ def get_habits() -> list[dict]:
         cursor.execute("""
             SELECT h.*,
                 MAX(hl.logged_at) as last_logged,
-                COUNT(CASE WHEN date(hl.logged_at) = date('now') THEN 1 END) as done_today
+                COUNT(CASE WHEN date(hl.logged_at) = date('now') THEN 1 END) as done_today,
+                GROUP_CONCAT(DISTINCT CASE WHEN date(hl.logged_at) = date('now')
+                                           THEN COALESCE(hl.source, 'manual') END) as today_sources
             FROM habits h
             LEFT JOIN habit_logs hl ON h.id = hl.habit_id
             GROUP BY h.id
@@ -391,16 +399,23 @@ def get_habits() -> list[dict]:
             """, (row["id"],))
             dates = [r["log_date"] for r in cursor.fetchall()]
             row["streak"] = _compute_streak(dates)
+            srcs = (row.pop("today_sources", None) or "").split(",")
+            srcs = [x for x in srcs if x]
+            # 'manual' wins when he tapped too; 'camera' only when the camera alone logged it
+            row["today_source"] = ("manual" if "manual" in srcs else srcs[0]) if srcs else None
         return rows
 
 
-def log_habit(habit_id: int, note: str = None) -> dict:
-    """Log a habit as done now."""
+def log_habit(habit_id: int, note: str = None, source: str = "manual",
+              logged_at: str = None) -> dict:
+    """Log a habit as done (now, or at `logged_at` UTC 'YYYY-MM-DD HH:MM:SS').
+    `source` is 'manual' for his tap, 'camera' for an auto-log."""
     with get_db() as conn:
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO habit_logs (habit_id, note) VALUES (?, ?)",
-            (habit_id, note)
+            "INSERT INTO habit_logs (habit_id, note, source, logged_at) "
+            "VALUES (?, ?, ?, COALESCE(?, datetime('now')))",
+            (habit_id, note, source, logged_at)
         )
         conn.commit()
         log_id = cursor.lastrowid

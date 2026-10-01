@@ -40,6 +40,10 @@ _DAY_TTL = 30  # seconds
 
 app = FastAPI(title="Life Dashboard Calendar API")
 
+# HABITS slide feed (habits-feed-1001): derived/commits/tokens/wall + 15-min camera auto-log
+import habits_api  # noqa: E402
+app.include_router(habits_api.router)   # router lifespan starts the auto-log loop
+
 # Serve templates directory
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"

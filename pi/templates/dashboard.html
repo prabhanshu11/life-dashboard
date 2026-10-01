@@ -929,7 +929,7 @@ function renderHabits() {
             <div class="he-dots">${dotsArr.join('')}</div>
             <div class="he-bar-wrap">
                 <div class="he-meta">
-                    <span>${doneToday?'completed today':'last: '+lastAgo}</span>
+                    <span>${doneToday?'completed today'+(h.today_source==='camera'?' · [CAMERA]':' · [TAP]'):'last: '+lastAgo}</span>
                     <span>${h.streak} day streak · ${streakPct.toFixed(0)}% of 30-day goal</span>
                 </div>
                 <div class="he-bar-bg"><div class="he-bar-fg" style="width:${streakPct.toFixed(1)}%"></div></div>
