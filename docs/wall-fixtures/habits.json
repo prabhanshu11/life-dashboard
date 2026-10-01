@@ -1,0 +1,1018 @@
+{
+ "mock": false,
+ "captured_from": "desktop 127.0.0.1:8090/api/habits/wall (lane habits-feed-1001)",
+ "generated": "2026-10-01T22:34:03+05:30",
+ "derived": {
+  "days": [
+   {
+    "date": "2026-09-18",
+    "bedtime": null,
+    "bedtime_provisional": false,
+    "wake": null,
+    "in_bed_h": 1.2,
+    "asleep_h": 0.0,
+    "desk_h": 0.1,
+    "moving_h": 0.0,
+    "away_count": 0,
+    "away_h": 0.0,
+    "evidence_pct": 83,
+    "minutes": {
+     "present": 62,
+     "mattress": 506,
+     "desk": 6,
+     "unknown": 246,
+     "lying": 71,
+     "away": 549
+    },
+    "exercise_bouts": [],
+    "camera_error": null
+   },
+   {
+    "date": "2026-09-19",
+    "bedtime": null,
+    "bedtime_provisional": false,
+    "wake": null,
+    "in_bed_h": 0.3,
+    "asleep_h": 0.0,
+    "desk_h": 0.8,
+    "moving_h": 0.0,
+    "away_count": 0,
+    "away_h": 0.0,
+    "evidence_pct": 67,
+    "minutes": {
+     "unknown": 443,
+     "mattress": 463,
+     "desk": 47,
+     "away": 403,
+     "lying": 18,
+     "present": 30,
+     "offline": 36
+    },
+    "exercise_bouts": [],
+    "camera_error": null
+   },
+   {
+    "date": "2026-09-20",
+    "bedtime": null,
+    "bedtime_provisional": false,
+    "wake": null,
+    "in_bed_h": 0.2,
+    "asleep_h": 0.0,
+    "desk_h": 0.7,
+    "moving_h": 0.0,
+    "away_count": 44,
+    "away_h": 10.0,
+    "evidence_pct": 87,
+    "minutes": {
+     "desk": 40,
+     "away": 698,
+     "mattress": 497,
+     "unknown": 189,
+     "lying": 11,
+     "present": 5
+    },
+    "exercise_bouts": [],
+    "camera_error": null
+   },
+   {
+    "date": "2026-09-21",
+    "bedtime": null,
+    "bedtime_provisional": false,
+    "wake": null,
+    "in_bed_h": 0.9,
+    "asleep_h": 0.0,
+    "desk_h": 2.3,
+    "moving_h": 0.1,
+    "away_count": 17,
+    "away_h": 2.5,
+    "evidence_pct": 79,
+    "minutes": {
+     "unknown": 194,
+     "mattress": 500,
+     "present": 60,
+     "lying": 52,
+     "away": 379,
+     "desk": 137,
+     "offline": 111,
+     "moving": 7
+    },
+    "exercise_bouts": [],
+    "camera_error": null
+   },
+   {
+    "date": "2026-09-22",
+    "bedtime": null,
+    "bedtime_provisional": false,
+    "wake": null,
+    "in_bed_h": 0.5,
+    "asleep_h": 0.0,
+    "desk_h": 0.7,
+    "moving_h": 0.1,
+    "away_count": 11,
+    "away_h": 1.4,
+    "evidence_pct": 83,
+    "minutes": {
+     "away": 544,
+     "unknown": 137,
+     "desk": 40,
+     "mattress": 531,
+     "present": 40,
+     "offline": 111,
+     "moving": 5,
+     "lying": 32
+    },
+    "exercise_bouts": [],
+    "camera_error": null
+   },
+   {
+    "date": "2026-09-23",
+    "bedtime": null,
+    "bedtime_provisional": false,
+    "wake": null,
+    "in_bed_h": 0.0,
+    "asleep_h": 0.0,
+    "desk_h": 0.5,
+    "moving_h": 0.0,
+    "away_count": 8,
+    "away_h": 4.4,
+    "evidence_pct": 66,
+    "minutes": {
+     "unknown": 166,
+     "offline": 329,
+     "desk": 32,
+     "mattress": 197,
+     "away": 716
+    },
+    "exercise_bouts": [],
+    "camera_error": null
+   },
+   {
+    "date": "2026-09-24",
+    "bedtime": null,
+    "bedtime_provisional": false,
+    "wake": null,
+    "in_bed_h": 0.6,
+    "asleep_h": 0.0,
+    "desk_h": 0.8,
+    "moving_h": 0.8,
+    "away_count": 32,
+    "away_h": 4.8,
+    "evidence_pct": 77,
+    "minutes": {
+     "offline": 135,
+     "unknown": 203,
+     "moving": 46,
+     "mattress": 300,
+     "away": 671,
+     "desk": 47,
+     "lying": 35,
+     "present": 3
+    },
+    "exercise_bouts": [
+     {
+      "start": "2026-09-24T02:17:00+05:30",
+      "minutes": 13,
+      "why": "moving"
+     },
+     {
+      "start": "2026-09-24T23:08:00+05:30",
+      "minutes": 24,
+      "why": "moving"
+     }
+    ],
+    "camera_error": null
+   },
+   {
+    "date": "2026-09-25",
+    "bedtime": null,
+    "bedtime_provisional": false,
+    "wake": "2026-09-25T11:51+05:30",
+    "in_bed_h": 1.2,
+    "asleep_h": 0.7,
+    "desk_h": 1.4,
+    "moving_h": 0.5,
+    "away_count": 11,
+    "away_h": 1.4,
+    "evidence_pct": 81,
+    "minutes": {
+     "unknown": 266,
+     "desk": 87,
+     "mattress": 442,
+     "away": 410,
+     "lying": 32,
+     "asleep": 41,
+     "present": 123,
+     "moving": 27,
+     "offline": 12
+    },
+    "exercise_bouts": [
+     {
+      "start": "2026-09-25T17:58:00+05:30",
+      "minutes": 27,
+      "why": "moving"
+     }
+    ],
+    "camera_error": null
+   },
+   {
+    "date": "2026-09-26",
+    "bedtime": null,
+    "bedtime_provisional": false,
+    "wake": null,
+    "in_bed_h": 1.5,
+    "asleep_h": 0.6,
+    "desk_h": 5.4,
+    "moving_h": 0.0,
+    "away_count": 25,
+    "away_h": 2.0,
+    "evidence_pct": 61,
+    "minutes": {
+     "present": 48,
+     "unknown": 400,
+     "away": 102,
+     "mattress": 312,
+     "desk": 326,
+     "offline": 164,
+     "lying": 55,
+     "asleep": 33
+    },
+    "exercise_bouts": [],
+    "camera_error": null
+   },
+   {
+    "date": "2026-09-27",
+    "bedtime": null,
+    "bedtime_provisional": false,
+    "wake": null,
+    "in_bed_h": 1.9,
+    "asleep_h": 1.0,
+    "desk_h": 1.1,
+    "moving_h": 0.0,
+    "away_count": 8,
+    "away_h": 1.6,
+    "evidence_pct": 65,
+    "minutes": {
+     "unknown": 493,
+     "present": 178,
+     "mattress": 139,
+     "desk": 66,
+     "away": 432,
+     "lying": 57,
+     "offline": 16,
+     "asleep": 59
+    },
+    "exercise_bouts": [],
+    "camera_error": null
+   },
+   {
+    "date": "2026-09-28",
+    "bedtime": null,
+    "bedtime_provisional": false,
+    "wake": null,
+    "in_bed_h": 0.8,
+    "asleep_h": 0.0,
+    "desk_h": 1.3,
+    "moving_h": 0.0,
+    "away_count": 13,
+    "away_h": 4.7,
+    "evidence_pct": 79,
+    "minutes": {
+     "unknown": 251,
+     "mattress": 323,
+     "lying": 46,
+     "desk": 80,
+     "away": 682,
+     "present": 9,
+     "offline": 49
+    },
+    "exercise_bouts": [],
+    "camera_error": null
+   },
+   {
+    "date": "2026-09-29",
+    "bedtime": null,
+    "bedtime_provisional": false,
+    "wake": "2026-09-29T10:03+05:30",
+    "in_bed_h": 5.0,
+    "asleep_h": 2.8,
+    "desk_h": 2.1,
+    "moving_h": 0.0,
+    "away_count": 22,
+    "away_h": 3.0,
+    "evidence_pct": 92,
+    "minutes": {
+     "unknown": 121,
+     "mattress": 374,
+     "present": 66,
+     "desk": 127,
+     "asleep": 170,
+     "away": 453,
+     "lying": 129
+    },
+    "exercise_bouts": [],
+    "camera_error": null
+   },
+   {
+    "date": "2026-09-30",
+    "bedtime": "2026-10-01T01:31+05:30",
+    "bedtime_provisional": false,
+    "wake": "2026-09-30T04:21+05:30",
+    "in_bed_h": 7.0,
+    "asleep_h": 4.6,
+    "desk_h": 1.6,
+    "moving_h": 0.5,
+    "away_count": 26,
+    "away_h": 4.3,
+    "evidence_pct": 76,
+    "minutes": {
+     "asleep": 274,
+     "desk": 99,
+     "lying": 144,
+     "mattress": 268,
+     "unknown": 302,
+     "away": 214,
+     "present": 73,
+     "offline": 39,
+     "moving": 27
+    },
+    "exercise_bouts": [
+     {
+      "start": "2026-09-30T16:32:00+05:30",
+      "minutes": 14,
+      "why": "moving"
+     }
+    ],
+    "camera_error": null
+   },
+   {
+    "date": "2026-10-01",
+    "bedtime": "2026-10-01T20:14+05:30",
+    "bedtime_provisional": true,
+    "wake": "2026-10-01T07:24+05:30",
+    "in_bed_h": 4.8,
+    "asleep_h": 1.3,
+    "desk_h": 1.3,
+    "moving_h": 0.0,
+    "away_count": 38,
+    "away_h": 5.3,
+    "evidence_pct": 80,
+    "minutes": {
+     "desk": 80,
+     "unknown": 276,
+     "mattress": 316,
+     "away": 197,
+     "lying": 211,
+     "present": 196,
+     "asleep": 78
+    },
+    "exercise_bouts": [],
+    "camera_error": null
+   }
+  ],
+  "medians": {
+   "in_bed_h": 1.1,
+   "asleep_h": 0.0,
+   "desk_h": 1.2,
+   "moving_h": 0.0,
+   "away_count": 15.0,
+   "away_h": 2.8,
+   "bedtime": "01:31",
+   "wake": "08:43"
+  },
+  "first_up_today": true,
+  "n_days_with_evidence": 14,
+  "source": "camera",
+  "camera_api": "http://127.0.0.1:8100",
+  "definitions": "(also returned under ``definitions`` so the wall can show them):\n- in_bed_h   = asleep + lying minutes of the local day / 60\n- desk_h     = desk minutes / 60;  moving_h = moving + treadmill minutes / 60\n- away_count = departures of him (slot person_1, or unidentified) lasting\n               >= 2 min that left on that day; away_h = their summed duration\n- night block: minutes on the mattress (asleep/lying/mattress) chained while\n  no more than UP_BRIDGE_MIN minutes of desk/moving/treadmill and no more than\n  GAP_BRIDGE_MIN minutes of anything else pass between two mattress minutes;\n  a block counts as a night when it lasts >= NIGHT_MIN_H hours with >= 60\n  lying/asleep minutes.\n- bedtime(D) = first lying/asleep minute of the night block that starts\n               between D 16:00 and D+1 06:00 and ends after D+1 04:00 (an\n               evening nap that ends before morning is not bedtime); a block\n               still running now counts as provisional after 30 lying minutes\n- wake(D)    = end of the first night block that ends between D 04:00 and\n               D 14:00 (a block still running \"now\" has not ended: no wake)\n- exercise bouts = continuous treadmill or moving runs >= 10 min, or any\n  segment the labeling pass named exercise/workout/yoga",
+  "generated": "2026-10-01T22:34:03+05:30",
+  "stale": false,
+  "error": null
+ },
+ "taps": [
+  {
+   "id": 1,
+   "name": "Exercise",
+   "emoji": "🏃",
+   "color": "#ff4757",
+   "streak": 1,
+   "done_today": false,
+   "today_source": null,
+   "last_logged": "2026-09-30 11:02:00",
+   "auto": true
+  },
+  {
+   "id": 2,
+   "name": "Meditate",
+   "emoji": "🧘",
+   "color": "#9c27b0",
+   "streak": 0,
+   "done_today": false,
+   "today_source": null,
+   "last_logged": null,
+   "auto": false
+  },
+  {
+   "id": 3,
+   "name": "Cook",
+   "emoji": "🍳",
+   "color": "#ff9800",
+   "streak": 0,
+   "done_today": false,
+   "today_source": null,
+   "last_logged": null,
+   "auto": false
+  },
+  {
+   "id": 4,
+   "name": "Laundry",
+   "emoji": "👕",
+   "color": "#4caf50",
+   "streak": 0,
+   "done_today": false,
+   "today_source": null,
+   "last_logged": null,
+   "auto": false
+  },
+  {
+   "id": 5,
+   "name": "Wake alarm",
+   "emoji": "⏰",
+   "color": "#4285f4",
+   "streak": 1,
+   "done_today": true,
+   "today_source": "camera",
+   "last_logged": "2026-10-01 01:54:00",
+   "auto": true
+  }
+ ],
+ "autolog": {
+  "enabled": true,
+  "flag": "HABITS_AUTOLOG",
+  "rules": [
+   {
+    "habit": "Wake alarm",
+    "auto": true,
+    "source": "camera",
+    "rule": "camera wake (end of the night block) before 08:00 local",
+    "logged_at": "the wake minute"
+   },
+   {
+    "habit": "Exercise",
+    "auto": true,
+    "source": "camera",
+    "rule": "continuous treadmill or moving bout >= 10 min, or a segment labelled exercise/workout/yoga",
+    "logged_at": "the bout start"
+   },
+   {
+    "habit": "Cook",
+    "auto": false,
+    "rule": "manual tap only"
+   },
+   {
+    "habit": "Laundry",
+    "auto": false,
+    "rule": "manual tap only"
+   },
+   {
+    "habit": "Meditate",
+    "auto": false,
+    "rule": "manual tap only"
+   }
+  ],
+  "idempotent": "one log per habit per local day; an existing manual tap wins",
+  "last_run": {
+   "enabled": true,
+   "logged": [
+    {
+     "habit": "Wake alarm",
+     "date": "2026-09-30",
+     "at": "2026-09-30T04:21+05:30",
+     "note": "camera: night ended 04:21",
+     "dry_run": false
+    },
+    {
+     "habit": "Exercise",
+     "date": "2026-09-30",
+     "at": "2026-09-30T16:32:00+05:30",
+     "note": "camera: moving bout 14 min from 16:32",
+     "dry_run": false
+    },
+    {
+     "habit": "Wake alarm",
+     "date": "2026-10-01",
+     "at": "2026-10-01T07:24+05:30",
+     "note": "camera: night ended 07:24",
+     "dry_run": false
+    }
+   ],
+   "skipped": [],
+   "ran_at": "2026-10-01T22:34:10+05:30"
+  }
+ },
+ "commits": {
+  "days": [
+   {
+    "date": "2026-09-18",
+    "commits": 282,
+    "repos": [
+     {
+      "repo": "star-trek-camera",
+      "commits": 282
+     }
+    ]
+   },
+   {
+    "date": "2026-09-19",
+    "commits": 0,
+    "repos": []
+   },
+   {
+    "date": "2026-09-20",
+    "commits": 1,
+    "repos": [
+     {
+      "repo": "local-bootstrapping",
+      "commits": 1
+     }
+    ]
+   },
+   {
+    "date": "2026-09-21",
+    "commits": 0,
+    "repos": []
+   },
+   {
+    "date": "2026-09-22",
+    "commits": 2,
+    "repos": [
+     {
+      "repo": "local-bootstrapping",
+      "commits": 2
+     }
+    ]
+   },
+   {
+    "date": "2026-09-23",
+    "commits": 0,
+    "repos": []
+   },
+   {
+    "date": "2026-09-24",
+    "commits": 227,
+    "repos": [
+     {
+      "repo": "star-trek-camera",
+      "commits": 202
+     },
+     {
+      "repo": "local-bootstrapping",
+      "commits": 13
+     },
+     {
+      "repo": "life-dashboard",
+      "commits": 12
+     }
+    ]
+   },
+   {
+    "date": "2026-09-25",
+    "commits": 209,
+    "repos": [
+     {
+      "repo": "star-trek-camera",
+      "commits": 177
+     },
+     {
+      "repo": "local-bootstrapping",
+      "commits": 18
+     },
+     {
+      "repo": "omarchy-voice-typing",
+      "commits": 14
+     }
+    ]
+   },
+   {
+    "date": "2026-09-26",
+    "commits": 7,
+    "repos": [
+     {
+      "repo": "star-trek-camera",
+      "commits": 6
+     },
+     {
+      "repo": "local-bootstrapping",
+      "commits": 1
+     }
+    ]
+   },
+   {
+    "date": "2026-09-27",
+    "commits": 2,
+    "repos": [
+     {
+      "repo": "local-bootstrapping",
+      "commits": 2
+     }
+    ]
+   },
+   {
+    "date": "2026-09-28",
+    "commits": 0,
+    "repos": []
+   },
+   {
+    "date": "2026-09-29",
+    "commits": 50,
+    "repos": [
+     {
+      "repo": "star-trek-camera",
+      "commits": 46
+     },
+     {
+      "repo": "local-bootstrapping",
+      "commits": 4
+     }
+    ]
+   },
+   {
+    "date": "2026-09-30",
+    "commits": 488,
+    "repos": [
+     {
+      "repo": "star-trek-camera",
+      "commits": 448
+     },
+     {
+      "repo": "local-bootstrapping",
+      "commits": 27
+     },
+     {
+      "repo": "omarchy-voice-typing",
+      "commits": 10
+     },
+     {
+      "repo": "life-dashboard",
+      "commits": 3
+     }
+    ]
+   },
+   {
+    "date": "2026-10-01",
+    "commits": 257,
+    "repos": [
+     {
+      "repo": "star-trek-camera",
+      "commits": 243
+     },
+     {
+      "repo": "local-bootstrapping",
+      "commits": 11
+     },
+     {
+      "repo": "life-dashboard",
+      "commits": 3
+     }
+    ]
+   }
+  ],
+  "total": 1525,
+  "streak": 3,
+  "author": "mail.prabhanshu@gmail.com",
+  "repos_scanned": 46,
+  "root": "/home/prabhanshu/Programs",
+  "host": "omarchy-desktop",
+  "stale": false,
+  "error": null,
+  "generated": "2026-10-01T22:34:45+05:30"
+ },
+ "tokens": {
+  "days": [
+   {
+    "date": "2026-09-18",
+    "input": 0,
+    "output": 0,
+    "cache_read": 0,
+    "cache_creation": 0,
+    "total": 0,
+    "cost_usd_est": 0.0,
+    "unpriced_tokens": 0,
+    "sessions": 0,
+    "by_machine": {},
+    "by_model": {}
+   },
+   {
+    "date": "2026-09-19",
+    "input": 0,
+    "output": 0,
+    "cache_read": 0,
+    "cache_creation": 0,
+    "total": 0,
+    "cost_usd_est": 0.0,
+    "unpriced_tokens": 0,
+    "sessions": 0,
+    "by_machine": {},
+    "by_model": {}
+   },
+   {
+    "date": "2026-09-20",
+    "input": 0,
+    "output": 0,
+    "cache_read": 0,
+    "cache_creation": 0,
+    "total": 0,
+    "cost_usd_est": 0.0,
+    "unpriced_tokens": 0,
+    "sessions": 0,
+    "by_machine": {},
+    "by_model": {}
+   },
+   {
+    "date": "2026-09-21",
+    "input": 0,
+    "output": 0,
+    "cache_read": 0,
+    "cache_creation": 0,
+    "total": 0,
+    "cost_usd_est": 0.0,
+    "unpriced_tokens": 0,
+    "sessions": 0,
+    "by_machine": {},
+    "by_model": {}
+   },
+   {
+    "date": "2026-09-22",
+    "input": 0,
+    "output": 0,
+    "cache_read": 0,
+    "cache_creation": 0,
+    "total": 0,
+    "cost_usd_est": 0.0,
+    "unpriced_tokens": 0,
+    "sessions": 0,
+    "by_machine": {},
+    "by_model": {}
+   },
+   {
+    "date": "2026-09-23",
+    "input": 4,
+    "output": 521,
+    "cache_read": 50783,
+    "cache_creation": 29132,
+    "total": 80440,
+    "cost_usd_est": 0.22,
+    "unpriced_tokens": 0,
+    "sessions": 1,
+    "by_machine": {
+     "desktop": {
+      "total": 80440,
+      "cost_usd_est": 0.22,
+      "sessions": 1
+     }
+    },
+    "by_model": {
+     "claude-opus-5": {
+      "total": 80440,
+      "cost_usd_est": 0.22
+     }
+    }
+   },
+   {
+    "date": "2026-09-24",
+    "input": 0,
+    "output": 0,
+    "cache_read": 0,
+    "cache_creation": 0,
+    "total": 0,
+    "cost_usd_est": 0.0,
+    "unpriced_tokens": 0,
+    "sessions": 0,
+    "by_machine": {},
+    "by_model": {}
+   },
+   {
+    "date": "2026-09-25",
+    "input": 0,
+    "output": 0,
+    "cache_read": 0,
+    "cache_creation": 0,
+    "total": 0,
+    "cost_usd_est": 0.0,
+    "unpriced_tokens": 0,
+    "sessions": 0,
+    "by_machine": {},
+    "by_model": {}
+   },
+   {
+    "date": "2026-09-26",
+    "input": 0,
+    "output": 0,
+    "cache_read": 0,
+    "cache_creation": 0,
+    "total": 0,
+    "cost_usd_est": 0.0,
+    "unpriced_tokens": 0,
+    "sessions": 0,
+    "by_machine": {},
+    "by_model": {}
+   },
+   {
+    "date": "2026-09-27",
+    "input": 0,
+    "output": 0,
+    "cache_read": 0,
+    "cache_creation": 0,
+    "total": 0,
+    "cost_usd_est": 0.0,
+    "unpriced_tokens": 0,
+    "sessions": 0,
+    "by_machine": {},
+    "by_model": {}
+   },
+   {
+    "date": "2026-09-28",
+    "input": 0,
+    "output": 0,
+    "cache_read": 0,
+    "cache_creation": 0,
+    "total": 0,
+    "cost_usd_est": 0.0,
+    "unpriced_tokens": 0,
+    "sessions": 0,
+    "by_machine": {},
+    "by_model": {}
+   },
+   {
+    "date": "2026-09-29",
+    "input": 2,
+    "output": 14,
+    "cache_read": 0,
+    "cache_creation": 41748,
+    "total": 41764,
+    "cost_usd_est": 0.26,
+    "unpriced_tokens": 0,
+    "sessions": 1,
+    "by_machine": {
+     "desktop": {
+      "total": 41764,
+      "cost_usd_est": 0.26,
+      "sessions": 1
+     }
+    },
+    "by_model": {
+     "claude-opus-5": {
+      "total": 41764,
+      "cost_usd_est": 0.26
+     }
+    }
+   },
+   {
+    "date": "2026-09-30",
+    "input": 206,
+    "output": 47011,
+    "cache_read": 3246116,
+    "cache_creation": 343621,
+    "total": 3636954,
+    "cost_usd_est": 2.18,
+    "unpriced_tokens": 0,
+    "sessions": 28,
+    "by_machine": {
+     "desktop": {
+      "total": 3636954,
+      "cost_usd_est": 2.18,
+      "sessions": 28
+     }
+    },
+    "by_model": {
+     "claude-opus-5": {
+      "total": 150503,
+      "cost_usd_est": 0.33
+     },
+     "claude-sonnet-5": {
+      "total": 3486451,
+      "cost_usd_est": 1.85
+     }
+    }
+   },
+   {
+    "date": "2026-10-01",
+    "input": 26,
+    "output": 5950,
+    "cache_read": 849802,
+    "cache_creation": 50170,
+    "total": 905948,
+    "cost_usd_est": 0.54,
+    "unpriced_tokens": 0,
+    "sessions": 1,
+    "by_machine": {
+     "desktop": {
+      "total": 905948,
+      "cost_usd_est": 0.54,
+      "sessions": 1
+     }
+    },
+    "by_model": {
+     "claude-opus-5-5": {
+      "total": 905948,
+      "cost_usd_est": 0.54
+     }
+    }
+   }
+  ],
+  "db": "/home/prabhanshu/Programs/datalake/datalake.db",
+  "prices_usd_per_mtok": {
+   "claude-fable-5-1": {
+    "input": 10.0,
+    "output": 50.0,
+    "cache_read": 0.25,
+    "cache_write_5m": 12.5
+   },
+   "claude-mythos-5-1": {
+    "input": 10.0,
+    "output": 50.0,
+    "cache_read": 0.25,
+    "cache_write_5m": 12.5
+   },
+   "claude-fable-5": {
+    "input": 10.0,
+    "output": 50.0,
+    "cache_read": 1.0,
+    "cache_write_5m": 12.5
+   },
+   "claude-opus-5-5": {
+    "input": 4.0,
+    "output": 20.0,
+    "cache_read": 0.2,
+    "cache_write_5m": 5.0
+   },
+   "claude-opus-5": {
+    "input": 5.0,
+    "output": 25.0,
+    "cache_read": 0.5,
+    "cache_write_5m": 6.25
+   },
+   "claude-opus-4-8": {
+    "input": 5.0,
+    "output": 25.0,
+    "cache_read": 0.5,
+    "cache_write_5m": 6.25
+   },
+   "claude-opus-4-7": {
+    "input": 5.0,
+    "output": 25.0,
+    "cache_read": 0.5,
+    "cache_write_5m": 6.25
+   },
+   "claude-opus-4-6": {
+    "input": 5.0,
+    "output": 25.0,
+    "cache_read": 0.5,
+    "cache_write_5m": 6.25
+   },
+   "claude-opus-4-5": {
+    "input": 5.0,
+    "output": 25.0,
+    "cache_read": 0.5,
+    "cache_write_5m": 6.25
+   },
+   "claude-sonnet-5-5": {
+    "input": 2.0,
+    "output": 10.0,
+    "cache_read": 0.2,
+    "cache_write_5m": 2.5
+   },
+   "claude-sonnet-5": {
+    "input": 2.0,
+    "output": 10.0,
+    "cache_read": 0.2,
+    "cache_write_5m": 2.5
+   },
+   "claude-sonnet-4-6": {
+    "input": 3.0,
+    "output": 15.0,
+    "cache_read": 0.3,
+    "cache_write_5m": 3.75
+   },
+   "claude-sonnet-4-5": {
+    "input": 3.0,
+    "output": 15.0,
+    "cache_read": 0.3,
+    "cache_write_5m": 3.75
+   },
+   "claude-haiku-4-5": {
+    "input": 1.0,
+    "output": 5.0,
+    "cache_read": 0.1,
+    "cache_write_5m": 1.25
+   }
+  },
+  "generated": "2026-10-01T22:34:45+05:30",
+  "latest_by_machine": {
+   "desktop": "2026-09-30T19:19:09.367Z"
+  },
+  "newest": "2026-09-30T19:19:09.367Z",
+  "stale": true,
+  "error": null,
+  "note": "datalake coverage: only sessions the datalake has ingested are counted"
+ }
+}
