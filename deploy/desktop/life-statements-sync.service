@@ -13,6 +13,10 @@ Wants=network-online.target life-finance-sync.service
 Type=oneshot
 WorkingDirectory=/home/prabhanshu/Programs/life-dashboard
 Environment=PYTHONUNBUFFERED=1
+# Statement passwords live in the passphrase-less finance sub-store (his decision 2026-10-02: an
+# unattended timer cannot use the main store, whose key needs a pinentry). Created once by
+# deploy/desktop/finance-substore-init.sh; isolated from ~/.password-store; never in git.
+Environment=PASSWORD_STORE_DIR=/home/prabhanshu/.password-store-finance
 ExecStart=/home/prabhanshu/Programs/life-dashboard/.venv/bin/python -m pi.statements_sync --days 90
 SuccessExitStatus=3
 Nice=10

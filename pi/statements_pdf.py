@@ -25,6 +25,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 PASS_TIMEOUT_S = 20
+FINANCE_STORE = Path(os.path.expanduser("~/.password-store-finance"))
 
 
 # ── passwords ───────────────────────────────────────────────────────────────
@@ -46,6 +47,10 @@ class PassCache:
         env = dict(os.environ)
         env["PASSWORD_STORE_GPG_OPTS"] = (env.get("PASSWORD_STORE_GPG_OPTS", "")
                                           + " --batch --pinentry-mode error").strip()
+        # The passphrase-less finance sub-store (deploy/desktop/finance-substore-init.sh) wins when it
+        # exists, so a CLI run behaves like the unit; PASSWORD_STORE_DIR set by the caller still wins.
+        if "PASSWORD_STORE_DIR" not in env and FINANCE_STORE.is_dir():
+            env["PASSWORD_STORE_DIR"] = str(FINANCE_STORE)
         try:
             r = subprocess.run([self.binary, "show", entry], capture_output=True, text=True,
                                timeout=self.timeout, env=env, stdin=subprocess.DEVNULL)

@@ -32,6 +32,12 @@ remote="${REMOTE:-}"
 if [ $LOCAL_ONLY -eq 0 ] && [ -z "$remote" ]; then
     case "$(hostname)" in omarchy-desktop) remote=laptop ;; *) remote=desktop ;; esac
 fi
+# Where the poller reads: the passphrase-less finance sub-store when it exists (desktop), else the
+# main store. Same rule on the remote side (evaluated there).
+if [ -z "${PASSWORD_STORE_DIR:-}" ] && [ -d "$HOME/.password-store-finance" ]; then
+    export PASSWORD_STORE_DIR="$HOME/.password-store-finance"
+fi
+remote_pre='d="$HOME/.password-store-finance"; [ -z "${PASSWORD_STORE_DIR:-}" ] && [ -d "$d" ] && export PASSWORD_STORE_DIR="$d";'
 
 rc=0
 for id in "${ids[@]}"; do
@@ -47,7 +53,7 @@ for id in "${ids[@]}"; do
         echo "  $(hostname): pass insert FAILED"; rc=1
     fi
     if [ $LOCAL_ONLY -eq 0 ]; then
-        if printf '%s\n' "$pw" | ssh -o BatchMode=yes -o ConnectTimeout=10 "$remote" "pass insert -m -f '$entry' >/dev/null"; then
+        if printf '%s\n' "$pw" | ssh -o BatchMode=yes -o ConnectTimeout=10 "$remote" "$remote_pre pass insert -m -f '$entry' >/dev/null"; then
             echo "  $remote: stored"
         else
             echo "  $remote: pass insert FAILED (is $remote reachable? run with --local-only there)"; rc=1

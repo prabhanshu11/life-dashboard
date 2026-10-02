@@ -19,6 +19,8 @@ Type=simple
 WorkingDirectory=/home/prabhanshu/Programs/life-dashboard/pi
 Environment=PYTHONUNBUFFERED=1
 Environment=CAMERA_API=http://127.0.0.1:8100
+# Same finance pass sub-store as life-statements-sync.service, for the API-triggered fallback sync.
+Environment=PASSWORD_STORE_DIR=/home/prabhanshu/.password-store-finance
 ExecStart=/usr/bin/uv run --no-project --with fastapi --with "uvicorn[standard]" --with pydantic --with httpx --with pyyaml uvicorn calendar_api:app --host 0.0.0.0 --port 8090
 Restart=always
 RestartSec=5

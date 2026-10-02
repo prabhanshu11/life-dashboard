@@ -46,7 +46,9 @@ The agent rules below allow restarting `life-dashboard` and starting
 `deploy.sh` also installs `life-statements-sync.service` + `.timer` (daily 07:10; the
 service pulls a finance sync first). It downloads statement / invoice attachments into
 `~/.local/state/life-dashboard/statements/<source>/` and opens protected PDFs with
-`pass show finance/statements/<source>` (see `docs/finance-integration.md` §C). Check it:
+`pass show finance/statements/<source>` from the passphrase-less finance sub-store
+`~/.password-store-finance` (one-time: `deploy/desktop/finance-substore-init.sh`; why and the
+trade-off: `docs/finance-integration.md` §C). Check it:
 
 ```bash
 ssh desktop 'cat ~/.local/state/life-dashboard/statements-sync-last.json; curl -s 127.0.0.1:8090/api/statements/locked'

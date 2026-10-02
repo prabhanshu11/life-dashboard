@@ -27,6 +27,10 @@ for a in "$@"; do
 done
 
 export PASSWORD_STORE_GPG_OPTS="${PASSWORD_STORE_GPG_OPTS:-} --batch --pinentry-mode error"
+# The poller reads the passphrase-less finance sub-store where it exists (desktop); check that one.
+if [ -z "${PASSWORD_STORE_DIR:-}" ] && [ -d "$HOME/.password-store-finance" ]; then
+    export PASSWORD_STORE_DIR="$HOME/.password-store-finance"
+fi
 
 dir=""
 for d in "${STATEMENTS_DIR:-}" "$HOME/.local/state/life-dashboard/statements" "$HOME/Programs/statements-unlock"; do
@@ -72,7 +76,7 @@ for id in "${IDS[@]}"; do
     done < <(find "$dir/$id" -maxdepth 1 -type f -iname '*.pdf' ! -name '*.open.pdf' -print0 2>/dev/null | sort -z)
     [ $found -eq 0 ] && echo "      (no PDFs under $dir/$id to test)"
 done
-echo "  present: $present/${#IDS[@]}${dir:+  pdf dir: $dir}"
+echo "  present: $present/${#IDS[@]}${dir:+  pdf dir: $dir}  store: ${PASSWORD_STORE_DIR:-$HOME/.password-store}"
 
 if [ $BOTH -eq 1 ]; then
     case "$(hostname)" in omarchy-desktop) remote=laptop ;; *) remote=desktop ;; esac

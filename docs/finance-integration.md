@@ -243,9 +243,19 @@ POST /api/statements/sync     starts life-statements-sync.service (non-blocking)
 GET  /api/finance/wall        + statements {locked, locked_sources, total, last, last_sync, error}
 ```
 
-Passwords live ONLY in `pass` on the desktop (`pass insert finance/statements/<id>`, first line = the
-PDF password). `pass` runs with `--batch --pinentry-mode error` and a 20 s timeout, so the timer never
-pops a pinentry and never hangs on a gpg lock; such a failure shows as `locked` with the reason.
+Passwords live ONLY in `pass` on the desktop, in the dedicated finance sub-store
+`~/.password-store-finance` (entries `finance/statements/<id>`, first line = the PDF password).
+Why a sub-store (his decision 2026-10-02): his main pass key needs a pinentry, which an unattended
+07:10 timer cannot answer (the 10-02 run showed "No pinentry", nothing cached in gpg-agent). The
+sub-store is encrypted to a separate key with NO passphrase ("life-dashboard finance (unattended)"),
+so the timer decrypts on its own. Trade-off he accepted: a stolen desktop disk exposes
+`finance/statements/*`; nothing else lives in that store, and his main store is untouched.
+Create / repair it with `deploy/desktop/finance-substore-init.sh` (idempotent; never in git), add
+entries with `scripts/statements-pass-insert.sh <id>` (type once, both machines) and check with
+`scripts/statements-pass-check.sh --both`; both scripts and `PassCache` pick the sub-store when it
+exists, the units set `PASSWORD_STORE_DIR` explicitly. `pass` runs with `--batch --pinentry-mode error`
+and a 20 s timeout, so the timer never pops a pinentry and never hangs on a gpg lock; such a failure
+shows as `locked` with the reason.
 Report of what is locked: `uv run python -m pi.statements_sync --report` or `/api/statements/locked`.
 Add a sender: append to the registry (match.from + optional subject/filename regexes, skip.* for mails
 that must never be downloaded, e.g. IOB PIN letters) and re-run.
