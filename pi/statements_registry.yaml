@@ -124,7 +124,11 @@ sources:
     password:
       pass_entry: finance/statements/jio
       hint: "first 4 letters of the connection's registered name in lower case + last 4 digits of the Jio number, e.g. rame7007 (confirmed by the bill mail)"
-      needed: true
+      # needed: false = his decision 2026-10-02: the recipe does not open the JioFiber PDF and he will not chase it;
+      # Jio spend is already in the parsed HDFC statements. The PDF is still downloaded, its status is
+      # 'skipped' (not 'locked'), so it never counts as waiting for a password. Flip to true to retry.
+      needed: false
+      decision: "dropped 2026-10-02; the HDFC statements already carry the Jio payments"
     parser: null
 
   - id: airtel

@@ -280,6 +280,24 @@ def _sync(tmp_path, msgs, entries, **kw):
                                     passwords=fake_pass(tmp_path, entries), **kw)
 
 
+def test_password_dropped_by_choice_is_skipped_not_locked(tmp_path):
+    # jio: registry password.needed: false (his decision 2026-10-02). The PDF is stored, stays
+    # encrypted, and is 'skipped': not in the locked list, not counted as waiting on the wall.
+    msgs = [mail("j1", "Jio <ebill.home@jio.com>", "Your JioFiber e-bill", d(1),
+                 [("SUM_123_456_20260802.pdf", encrypt(savings_pdf(), "jiox1234"))])]
+    c = _sync(tmp_path, msgs, {})["counts"]
+    assert c["stored"] == 1 and c["locked"] == 0 and c["skipped"] == 1
+    st = statements_sync._q("SELECT * FROM statements WHERE source='jio'", one=True)
+    assert st["status"] == "skipped" and "dropped by choice" in st["reason"] and st["encrypted"] == 1
+    assert statements_sync.locked_list() == []
+    w = statements_sync.wall_block()
+    assert w["locked"] == 0 and w["skipped"] == 1 and w["total"] == 1
+    # the entry appears later -> the retry opens it (still local work)
+    c = _sync(tmp_path, [], {"finance/statements/jio": "jiox1234"})["counts"]
+    assert statements_sync._q("SELECT status FROM statements WHERE source='jio'", one=True)["status"] == "open"
+    assert c["skipped"] == 0
+
+
 def test_end_to_end_store_lock_open_parse_and_dedup(tmp_path):
     # e-mail alerts already in the ledger: the zomato debit and the amazon card spend
     finance_db.add_transaction(ts=d(5).replace(hour=13).isoformat(), amount=450.0, direction="debit",

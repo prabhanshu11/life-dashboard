@@ -83,6 +83,16 @@ class Source(dict):
     def hint(self) -> str:
         return (self.get("password") or {}).get("hint") or ""
 
+    @property
+    def password_needed(self) -> bool:
+        """False = he decided not to chase this password (registry password.needed: false +
+        password.decision). A locked file then becomes 'skipped': kept, not counted as waiting."""
+        return (self.get("password") or {}).get("needed", True) is not False
+
+    @property
+    def decision(self) -> str:
+        return (self.get("password") or {}).get("decision") or ""
+
 
 class Registry:
     def __init__(self, sources: list[dict]):
@@ -143,7 +153,7 @@ def init_db() -> None:
             path          TEXT,
             open_path     TEXT,
             encrypted     INTEGER,
-            status        TEXT,                   -- open | locked | parsed | failed
+            status        TEXT,                   -- open | locked | skipped (password dropped by choice) | parsed | failed
             reason        TEXT,
             parsed_rows   INTEGER DEFAULT 0,
             matched_rows  INTEGER DEFAULT 0,
@@ -316,7 +326,9 @@ def process_file(stmt: dict, source: Source | None, passwords) -> dict:
     else:
         r = statements_pdf.open_pdf(path, source.pass_entry if source else None, passwords)
         upd.update(status=r["status"], reason=r["reason"], open_path=r["open_path"], encrypted=int(r["encrypted"]))
-        if r["status"] == "locked" and source and source.hint:
+        if r["status"] == "locked" and source and not source.password_needed:
+            upd.update(status="skipped", reason=f"password dropped by choice: {source.decision or 'not needed'}")
+        elif r["status"] == "locked" and source and source.hint:
             upd["reason"] = f"{r['reason']}; hint: {source.hint}"
     counts = None
     parser = (source or {}).get("parser")
@@ -353,7 +365,8 @@ def run_sync(days: int = DEFAULT_DAYS, service=None, meter=None, passwords=None,
     meter = meter or finance_gmail.QuotaMeter()
     t0 = time.time()
     counts = {"ids_listed": 0, "messages_fetched": 0, "skipped_seen": 0, "stored": 0, "duplicates": 0,
-              "skipped_files": 0, "opened": 0, "locked": 0, "parsed": 0, "failed": 0, "retried_locked": 0,
+              "skipped_files": 0, "opened": 0, "locked": 0, "skipped": 0, "parsed": 0, "failed": 0,
+              "retried_locked": 0,
               "rows_inserted": 0, "rows_matched": 0, "discovery_listed": 0, "discovery_fetched": 0,
               "units": 0, "rate_limited": 0, "error": None}
     query = statements_gmail.registry_query(reg.senders, days)
@@ -364,14 +377,14 @@ def run_sync(days: int = DEFAULT_DAYS, service=None, meter=None, passwords=None,
     try:
         svc = service or finance_gmail.build_service()
         # 0. locked / unparsed files from earlier runs (local work, no Gmail units)
-        for stmt in _q("SELECT * FROM statements WHERE status IN ('locked','open')"):
+        for stmt in _q("SELECT * FROM statements WHERE status IN ('locked','open','skipped')"):
             src = reg.by_id.get(stmt["source"])
             was = stmt["status"]
             if was == "open" and not (src and src.get("parser")):
                 continue
             new = process_file(stmt, src, passwords)
             counts["retried_locked"] += was == "locked"
-            if was == "locked" and new["status"] != "locked":
+            if was in ("locked", "skipped") and new["status"] not in ("locked", "skipped"):
                 log.info("statement %s opened on retry (%s)", stmt["filename"], new["status"])
         # 1. registry senders
         try:
@@ -448,8 +461,8 @@ def run_sync(days: int = DEFAULT_DAYS, service=None, meter=None, passwords=None,
         counts["units"] = meter.spent
         counts["rate_limited"] = meter.rate_limited
         st = {r["status"]: r["n"] for r in _q("SELECT status, COUNT(*) n FROM statements GROUP BY status")}
-        counts.update(opened=st.get("open", 0), locked=st.get("locked", 0), parsed=st.get("parsed", 0),
-                      failed=st.get("failed", 0))
+        counts.update(opened=st.get("open", 0), locked=st.get("locked", 0), skipped=st.get("skipped", 0),
+                      parsed=st.get("parsed", 0), failed=st.get("failed", 0))
         r = _q("SELECT SUM(txn_id IS NOT NULL) i, SUM(matched_email_id IS NOT NULL) m FROM statement_rows", one=True)
         counts.update(rows_inserted=r["i"] or 0, rows_matched=r["m"] or 0)
         state["duration_s"] = round(time.time() - t0, 2)
@@ -506,8 +519,9 @@ def api_summary() -> dict:
     reg = load_registry()
     counts = {r["status"]: r["n"] for r in _q("SELECT status, COUNT(*) n FROM statements GROUP BY status")}
     per = {r["source"]: r for r in _q(
-        "SELECT source, COUNT(*) n, SUM(status='locked') locked, SUM(status='parsed') parsed,"
-        " SUM(status='open') open, SUM(status='failed') failed, MAX(received) last_received"
+        "SELECT source, COUNT(*) n, SUM(status='locked') locked, SUM(status='skipped') skipped,"
+        " SUM(status='parsed') parsed, SUM(status='open') open, SUM(status='failed') failed,"
+        " MAX(received) last_received"
         " FROM statements GROUP BY source")}
     sources = []
     for s in reg.sources:
@@ -516,7 +530,7 @@ def api_summary() -> dict:
         sources.append({"id": s.id, "name": s.get("name"), "kind": s.get("kind"), "folder": s.get("folder"),
                         "from": (s.get("match") or {}).get("from"), "parser": s.get("parser"),
                         "password": s.get("password"), "files": p.get("n", 0),
-                        "counts": {k: p.get(k) or 0 for k in ("open", "locked", "parsed", "failed")},
+                        "counts": {k: p.get(k) or 0 for k in ("open", "locked", "skipped", "parsed", "failed")},
                         "last_file": _pub(last)})
     disc = _q("SELECT from_addr, COUNT(*) n, MAX(received) last, GROUP_CONCAT(filenames, '|') files"
               " FROM attachment_discovery WHERE registered IS NULL GROUP BY from_addr ORDER BY n DESC")
@@ -530,10 +544,11 @@ def wall_block() -> dict:
     """What the wall's FINANCE slide shows: 'N statements waiting for a password'."""
     init_db()
     locked = _q("SELECT COUNT(*) n, COUNT(DISTINCT source) s FROM statements WHERE status='locked'", one=True)
+    skipped = _q("SELECT COUNT(*) n FROM statements WHERE status='skipped'", one=True)["n"]
     last = _q("SELECT * FROM statements ORDER BY received DESC, id DESC LIMIT 1", one=True)
     total = _q("SELECT COUNT(*) n FROM statements", one=True)["n"]
     st = read_state() or {}
-    return {"locked": locked["n"], "locked_sources": locked["s"], "total": total,
+    return {"locked": locked["n"], "locked_sources": locked["s"], "skipped": skipped, "total": total,
             "last": {k: last[k] for k in ("source", "filename", "received", "status")} if last else None,
             "last_sync": st.get("ts"), "error": st.get("error")}
 
