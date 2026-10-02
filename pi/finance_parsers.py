@@ -148,6 +148,10 @@ _REFUND = re.compile(r"\brefund|reversal|SmartBuy_Bonus|cashback|APPLE MEDIA", r
 # a credit in his own name, or from the IOB branch account. Outside income, spend and net.
 _SELF = re.compile(r"PRABHANSHU RAJPOOT|PRABHANSHU RAJPUT|UPI-PRABHANSHU\b|IOBA0002903", re.I)
 _INTEREST = re.compile(r"Interest paid", re.I)
+# his review 10-02: Mayank Chaurasia and his uncle Sunil Kumar (VPA terramets@…) = loans back, confirmed;
+# Badal Joshi and Lakshya Mishra = "ordinary credits": neither loans nor income (plain transfer).
+_LOAN_CONFIRMED = re.compile(r"MAYANK CHAURASIA|SUNIL KUMAR|terramets", re.I)
+_ORDINARY_CREDIT = re.compile(r"BADAL JOSHI|LAKSHYA MISHRA", re.I)
 # a person paying into savings by UPI, as a statement row (no alert text): same tentative bucket
 _STMT_PERSON_UPI = re.compile(r"statement hdfc_savings: UPI-[A-Z][A-Z .]+", re.I)
 # tentative (his review 10-02: "must be some loan I gave to my friends"): a person's UPI/NEFT credit
@@ -174,6 +178,10 @@ def classify(merchant: str | None, text: str | None, direction: str, amount: flo
             return "self_transfer", None
         if _INTEREST.search(hay):
             return "interest", None
+        if _LOAN_CONFIRMED.search(hay):
+            return "loan_repayment", None
+        if _ORDINARY_CREDIT.search(hay):
+            return "transfer", None
         if _PERSON_CREDIT.search(hay) or _STMT_PERSON_UPI.search(hay):
             return "loan_repayment", "unconfirmed"
         return None

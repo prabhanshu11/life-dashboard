@@ -216,6 +216,7 @@ from the bank — "they should not be double counted"; rent to Rinku 12 k (+ a 5
 | `company` | Avanti's IOB account `NEFT Dr-IOBA0002903-AVANTI` / `UPI-…0490-IOBA0002903`, and `Hostinger` (VPS, yearly autopay on CC 0629, 2026-10-02 "Your payment for Hostinger Pte Ltd is registered") — "my father's and mine company" | its own line, outside personal spend and net |
 | `rent` also | `harishkumar0607` / `HARISH KUMAR` = the old house (Jun–Aug) | rent across the move |
 | `refund` / `cashback` | card-side credits: `refund`, `reversal`, order refund mails, `SmartBuy_Bonus` (any credit on an HDFC CC account that is not a bill payment) | refunds bucket |
+| `loan_repayment` | confirmed 10-02: `MAYANK CHAURASIA`, uncle `SUNIL KUMAR` (VPA `terramets@`, not the company); `BADAL JOSHI` / `LAKSHYA MISHRA` are ordinary credits (`transfer`, in "other credits") | loans back |
 | `loan_repayment` (`unconfirmed`) | a person's UPI/NEFT credit into savings ("successfully credited to your HDFC Bank A/c") that is not salary — his guess: friends repaying loans | shown apart from salary, outside net, pending his confirmation |
 | `self_transfer` | a credit in his own name (`PRABHANSHU RAJPOOT`, `UPI-PRABHANSHU`) or from his IOB branch account `IOBA0002903` — his own money moving between his accounts (confirmed 10-02 for the 8,000 of 09-22) | outside income, spend and net |
 | `interest` | `Interest paid till …` on the savings statement | income (with salary) |

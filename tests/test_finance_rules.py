@@ -43,9 +43,15 @@ def test_classify_real_strings():
     assert c("PRABHANSHU RAJPOOT", "Rs.8000.00 has been successfully credited to your HDFC Bank A/c",
              "credit", 8000) == ("self_transfer", None)
     assert c(None, "statement hdfc_savings: UPI-PRABHANSHU", "credit", 99) == ("self_transfer", None)
+    # his review 10-02 (round 3): Mayank + uncle Sunil Kumar (terramets@) = confirmed loans back,
+    # not company; Badal Joshi / Lakshya Mishra = ordinary credits, neither loans nor income
     assert c("MAYANK CHAURASIA", "Rs.2000.00 has been successfully credited to your HDFC Bank A/c",
-             "credit", 2000) == ("loan_repayment", "unconfirmed")
-    assert c(None, "statement hdfc_savings: UPI-BADAL JOSHI", "credit", 2189) == ("loan_repayment", "unconfirmed")
+             "credit", 2000) == ("loan_repayment", None)
+    assert c(None, "statement hdfc_savings: UPI-SUNIL KUMAR-terramets@", "credit", 8000) == ("loan_repayment", None)
+    assert c(None, "statement hdfc_savings: UPI-BADAL JOSHI", "credit", 2189) == ("transfer", None)
+    assert c("Lakshya Mishra", "Rs.2000.00 has been successfully credited to your HDFC Bank A/c",
+             "credit", 2000) == ("transfer", None)
+    assert c(None, "statement hdfc_savings: UPI-SOME NEW PERSON", "credit", 500) == ("loan_repayment", "unconfirmed")
     assert c("APPLE MEDIA SERVICES", "Rs.195.00 has been successfully credited", "credit", 195) == ("refund", None)
     assert c(None, "statement hdfc_savings: Interest paid till 30-JUN-2026", "credit", 211) == ("interest", None)
     # his review 10-02: Harish Kumar = old-house rent; Avanti (IOB) + Hostinger = the company; OTP mails junk
