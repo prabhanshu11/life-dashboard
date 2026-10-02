@@ -213,9 +213,13 @@ from the bank — "they should not be double counted"; rent to Rinku 12 k (+ a 5
 | `cc_bill_payment` | `Mycards CC bill pay-…`, `UPI-PZ HDFC CC BILLPAY`, `pzhdfcccbillpayupi@hdfcbank`, `IB BILLPAY DR-HDFC97-…`, bare `IB BILLPAY` ≥ 5 k | transfers, never spend (the card rows were counted when swiped; the card-side "payment received" credit is already skipped by the statements poller) |
 | `rent` (`advance` when > 1.5 × 12 k) | VPA `rinku.chauhan1988.08@okhdfcbank` | spend; the advance is counted the month the money left, flagged so the month is not misread |
 | `family_transfer` | father = `to account 1049` / `XXXXXXXXXX1049-BARB0SAPRBS` (the name never appears in bank text); `RAJPOOT`/`RAJPUT`; the sister's `9860251934` | not spend; subtracted in net cash flow; shown in the transfers bucket |
+| `company` | Avanti's IOB account `NEFT Dr-IOBA0002903-AVANTI` / `UPI-…0490-IOBA0002903`, and `Hostinger` (VPS, yearly autopay on CC 0629, 2026-10-02 "Your payment for Hostinger Pte Ltd is registered") — "my father's and mine company" | its own line, outside personal spend and net |
+| `rent` also | `harishkumar0607` / `HARISH KUMAR` = the old house (Jun–Aug) | rent across the move |
+| `refund` / `cashback` | card-side credits: `refund`, `reversal`, order refund mails, `SmartBuy_Bonus` (any credit on an HDFC CC account that is not a bill payment) | refunds bucket |
+| `loan_repayment` (`unconfirmed`) | a person's UPI/NEFT credit into savings ("successfully credited to your HDFC Bank A/c") that is not salary — his guess: friends repaying loans | shown apart from salary, outside net, pending his confirmation |
 | `ignored` (`not a transaction`) | HDFC mails that parse like a debit but are not one: `Forex Conversion Markup Fee`, `Payment Unsuccessful`, `set up device` (the 08-21 ANTHROPIC debit had been counted 3×, 09-22 2×, a 50 k device mail once) | out of every figure |
 
-Spend = debits minus those three; income = salary; refunds (`refund`, `cashback`) are their own bucket;
+Spend = debits minus ignored / card bills / family / company; income = salary; refunds (`refund`, `cashback`) are their own bucket;
 **net cash flow = income + refunds − spend − family transfers.** `get_summary()` adds `rent_month`,
 `transfers_month`, `refunds_month`, `months` (last 4 calendar months). The rules run at insert
 (`add_transaction`) and over the whole ledger with `uv run python -m finance_db reclassify`

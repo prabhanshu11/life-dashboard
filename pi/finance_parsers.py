@@ -121,21 +121,32 @@ def infer_category(merchant: str | None, body: str = "") -> str:
 # ── his rules (2026-10-02): salary in, rent, family, card-bill settlements, non-transaction mails ──
 # Strings discovered in the real ledger (not guessed), see docs/finance-integration.md "Categorisation".
 RENT_MONTHLY = 12000.0                       # Rinku, monthly; anything well above it is an advance
-PRIORITY_CATEGORIES = ("ignored", "salary", "cc_bill_payment", "rent", "family_transfer")
-EXCLUDED_FROM_SPEND = ("ignored", "cc_bill_payment", "family_transfer")   # settlements / transfers / junk
+PRIORITY_CATEGORIES = ("ignored", "salary", "cc_bill_payment", "rent", "family_transfer", "company",
+                       "refund", "cashback", "loan_repayment")
+# settlements / transfers / junk / the company's money: never personal spend
+EXCLUDED_FROM_SPEND = ("ignored", "cc_bill_payment", "family_transfer", "company")
 INCOME_CATEGORIES = ("salary",)
 REFUND_CATEGORIES = ("refund", "cashback")
 # HDFC mails that are NOT transactions but parse like one (same amount as the real debit alert):
-# the forex markup-fee notice, the "payment unsuccessful" notice, the mobile-banking device mail.
+# the forex markup-fee notice, the "payment unsuccessful" notice, the device mail, OTP mails.
 _NOT_A_TXN = re.compile(r"Forex Conversion Markup Fee|Payment Unsuccessful|set up device"
-                        r"|successfully registered for the HDFC Bank App", re.I)
+                        r"|successfully registered for the HDFC Bank App|\bOTP\b", re.I)
 _SALARY = re.compile(r"NEFT Cr-BOFA0CN6215|\bsalary\b|payroll", re.I)       # employer NEFT, month end
 _CC_BILL = re.compile(r"CC bill pay|CC BILLPAY|ccbillpay|IB BILLPAY DR-HDFC97|\bHDFC97\b", re.I)
 _CC_BILL_BARE = re.compile(r"\bIB BILLPAY\b", re.I)                          # netbanking bill pay, no biller
-_RENT = re.compile(r"rinku\.chauhan1988|\bRINKU\b", re.I)
+# Rinku (new house) + Harish Kumar (old house, Jun-Aug): rent across the move (his review 10-02).
+_RENT = re.compile(r"rinku\.chauhan1988|\bRINKU\b|harishkumar0607|HARISH KUMAR", re.I)
 # father: his UPI shows only "to account 1049" (Bank of Baroda, BARB0SAPRBS); statements mask it as
 # XXXXXXXXXX1049-BARB0SAPRBS. Family surname and the sister's number cover the rest.
 _FAMILY = re.compile(r"to account 1049\b|X{4,}1049-BARB|1049-BARB0SAPRBS|\bRAJPOOT\b|\bRAJPUT\b|9860251934", re.I)
+# "this is my father's and mine company": Avanti's IOB account + the Hostinger VPS (yearly autopay,
+# 2026-10-02 on CC 0629: "Your payment for Hostinger Pte Ltd is registered").
+_COMPANY = re.compile(r"IOBA0002903|\bAVANTI\b|hostinger", re.I)
+# card-side credits that are not money in: merchant reversals, order refunds, SmartBuy bonus
+_REFUND = re.compile(r"\brefund|reversal|SmartBuy_Bonus|cashback", re.I)
+# tentative (his review 10-02: "must be some loan I gave to my friends"): a person's UPI/NEFT credit
+# into savings that is neither salary nor a refund. Shown apart from salary, outside net, until confirmed.
+_PERSON_CREDIT = re.compile(r"successfully credited to your HDFC Bank|has been credited", re.I)
 
 
 def classify(merchant: str | None, text: str | None, direction: str, amount: float | None,
@@ -143,17 +154,27 @@ def classify(merchant: str | None, text: str | None, direction: str, amount: flo
     """(category, tag) for the rows his rules decide, else None (the regex table applies)."""
     hay = f"{merchant or ''} {text or ''}"
     amt = float(amount or 0)
+    acct = account or ""
     if _NOT_A_TXN.search(hay):
         return "ignored", "not a transaction"
-    if direction == "credit" and amt >= 50000 and _SALARY.search(hay):
-        return "salary", None
-    if direction == "debit":
-        if _CC_BILL.search(hay) or (amt >= 5000 and _CC_BILL_BARE.search(hay)):
-            return "cc_bill_payment", None
-        if _RENT.search(hay):
-            return "rent", ("advance" if amt > RENT_MONTHLY * 1.5 else None)
-        if _FAMILY.search(hay):
-            return "family_transfer", None
+    if direction == "credit":
+        if amt >= 50000 and _SALARY.search(hay):
+            return "salary", None
+        if re.search(r"SmartBuy_Bonus|cashback", hay, re.I):
+            return "cashback", None
+        if _REFUND.search(hay) or acct.startswith("HDFC CC"):
+            return "refund", None           # a card credit that is not a bill payment is a reversal
+        if _PERSON_CREDIT.search(hay):
+            return "loan_repayment", "unconfirmed"
+        return None
+    if _CC_BILL.search(hay) or (amt >= 5000 and _CC_BILL_BARE.search(hay)):
+        return "cc_bill_payment", None
+    if _COMPANY.search(hay):
+        return "company", None
+    if _RENT.search(hay):
+        return "rent", ("advance" if amt > RENT_MONTHLY * 1.5 else None)
+    if _FAMILY.search(hay):
+        return "family_transfer", None
     return None
 
 

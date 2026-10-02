@@ -243,6 +243,8 @@ def get_summary() -> dict:
         "other_credits_month": this["other_credits"],
         "rent_month": {k: this[k] for k in ("rent", "rent_advance", "rent_n")},
         "transfers_month": {k: this[k] for k in ("cc_bill_payments", "cc_bill_n", "family", "family_n")},
+        "company_month": {k: this[k] for k in ("company", "company_n")},
+        "loans_in_month": {k: this[k] for k in ("loans_in", "loans_n")},
         "ignored_month": this["ignored"],
         "months": months,
         "burn_rate_daily": round(burn_rate, 2),
@@ -254,10 +256,11 @@ def get_summary() -> dict:
     }
 
 
-# His rules (2026-10-02): spend = debits minus card-bill settlements, family transfers and junk mails;
-# income = salary; refunds are their own bucket; net = income + refunds − spend − family transfers.
+# His rules (2026-10-02): spend = debits minus card-bill settlements, family transfers, the company's
+# money (Avanti / Hostinger) and junk mails; income = salary; refunds and friends' loan repayments are
+# their own buckets; net = income + refunds − spend − family transfers (company and loans stay outside).
 # The bank→card bill payment is never spend: the card rows it settles were counted when swiped.
-_SPEND_FILTER = "COALESCE(category,'') NOT IN ('ignored','cc_bill_payment','family_transfer')"
+_SPEND_FILTER = "COALESCE(category,'') NOT IN ('ignored','cc_bill_payment','family_transfer','company')"
 
 
 def month_flows(conn, since: datetime, until: datetime) -> dict:
@@ -270,7 +273,9 @@ def month_flows(conn, since: datetime, until: datetime) -> dict:
     refunds = float(q(f"SELECT COALESCE(SUM(amount),0) {base} AND direction='credit'"
                       " AND category IN ('refund','cashback')")[0])
     other_cr = float(q(f"SELECT COALESCE(SUM(amount),0) {base} AND direction='credit'"
-                       " AND COALESCE(category,'') NOT IN ('salary','refund','cashback','ignored')")[0])
+                       " AND COALESCE(category,'') NOT IN ('salary','refund','cashback','ignored','loan_repayment')")[0])
+    loans = q(f"SELECT COALESCE(SUM(amount),0), COUNT(*) {base} AND direction='credit' AND category='loan_repayment'")
+    comp = q(f"SELECT COALESCE(SUM(amount),0), COUNT(*) {base} AND direction='debit' AND category='company'")
     spend = float(q(f"SELECT COALESCE(SUM(amount),0) {base} AND direction='debit' AND {_SPEND_FILTER}")[0])
     rent = q(f"SELECT COALESCE(SUM(amount),0), COALESCE(SUM(CASE WHEN tag='advance' THEN amount END),0),"
              f" COUNT(*) {base} AND direction='debit' AND category='rent'")
@@ -283,6 +288,8 @@ def month_flows(conn, since: datetime, until: datetime) -> dict:
         "rent": round(float(rent[0]), 2), "rent_advance": round(float(rent[1]), 2), "rent_n": int(rent[2]),
         "cc_bill_payments": round(float(cc[0]), 2), "cc_bill_n": int(cc[1]),
         "family": round(float(fam[0]), 2), "family_n": int(fam[1]),
+        "company": round(float(comp[0]), 2), "company_n": int(comp[1]),
+        "loans_in": round(float(loans[0]), 2), "loans_n": int(loans[1]),
         "ignored": round(ign, 2),
         "net": round(income + refunds - spend - float(fam[0]), 2),
         "salary_seen": income > 0,

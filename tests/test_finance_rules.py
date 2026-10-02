@@ -39,7 +39,17 @@ def test_classify_real_strings():
              "debit", 50000)[0] == "ignored"
     # ordinary rows are left to the regex table; a credit with his name is not a family transfer
     assert c("Swiggy", "UPI txn", "debit", 450) is None
-    assert c("PRABHANSHU RAJPOOT", "Account update", "credit", 8000) is None
+    assert c("PRABHANSHU RAJPOOT", "Rs.8000.00 has been successfully credited to your HDFC Bank A/c",
+             "credit", 8000) == ("loan_repayment", "unconfirmed")
+    # his review 10-02: Harish Kumar = old-house rent; Avanti (IOB) + Hostinger = the company; OTP mails junk
+    assert c("harishkumar0607-2@okaxis", "UPI txn", "debit", 12017) == ("rent", None)
+    assert c(None, "statement hdfc_savings: UPI-HARISH KUMAR-harishkumar0607-2@", "debit", 12750)[0] == "rent"
+    assert c(None, "statement hdfc_savings: NEFT Dr-IOBA0002903-AVANTI", "debit", 100000) == ("company", None)
+    assert c(None, "statement hdfc_savings: UPI-XXXXXXXXXXX0490-IOBA0002903-61", "debit", 28000)[0] == "company"
+    assert c(None, "Your payment for Hostinger Pte Ltd is registered", "debit", 15000, "HDFC CC 0629") == ("company", None)
+    assert c(None, "986447 is the OTP for Hostinger initiated using your HDFC Bank", "debit", 1)[0] == "ignored"
+    assert c("Amazon", "A refund was processed to your Credit Card", "credit", 654, "HDFC CC 4089") == ("refund", None)
+    assert c("SmartBuy_Bonus_5per_CB0000", "statement hdfc_cc", "credit", 227.45, "HDFC CC 0629") == ("cashback", None)
     assert c("ANTHROPIC", "Rs.22602.33 debited via Debit Card", "debit", 22602.33) is None
 
 
@@ -64,7 +74,11 @@ def test_summary_buckets_and_net_cash_flow():
     _add(1, 22602.33, "debit", "ANTHROPIC", "Important: Forex Conversion Markup Fee on cross-border")
     _add(1, 250, "credit", "Amazon", "A refund was processed to your Credit Card", source="hdfc_cc",
          account="HDFC CC 4089", category="refund")
+    _add(1, 15000, "debit", None, "Your payment for Hostinger Pte Ltd is registered", source="hdfc_cc", account="HDFC CC 0629")
+    _add(1, 2000, "credit", "MAYANK CHAURASIA", "Rs.2000.00 has been successfully credited to your HDFC Bank A/c")
     s = finance_db.get_summary()
+    assert s["company_month"] == {"company": 15000, "company_n": 1}
+    assert s["loans_in_month"] == {"loans_in": 2000, "loans_n": 1}
     # spend counts the card rows ONCE; the bill payment, the family transfer and the junk mail are out
     assert s["spend_month"] == pytest.approx(2000 + 3000 + 12000 + 50000 + 22602.33)
     assert s["income_month"] == 161379

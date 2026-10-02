@@ -660,13 +660,15 @@ body { display: flex; flex-direction: column; font-family: 'Space Grotesk', syst
                 <div class="fin-row"><span class="fin-row-key">SPEND</span><span class="fin-row-val bad" id="finSpend">—</span></div>
                 <div class="fin-row"><span class="fin-row-key">RENT <span id="finRentTag" style="color:#b08030"></span></span><span class="fin-row-val" id="finRent">—</span></div>
                 <div class="fin-row"><span class="fin-row-key">REFUNDS</span><span class="fin-row-val good" id="finRefunds">—</span></div>
+                <div class="fin-row"><span class="fin-row-key">LOANS BACK <span style="color:#b08030">unconfirmed</span></span><span class="fin-row-val good" id="finLoansIn">—</span></div>
                 <div class="fin-row"><span class="fin-row-key">TODAY</span><span class="fin-row-val" id="finToday">—</span></div>
                 <div class="fin-row"><span class="fin-row-key">THIS WEEK</span><span class="fin-row-val" id="finWeek">—</span></div>
             </div>
-            <div class="fin-panel-title" style="margin:18px 0 8px">Transfers · not spend</div>
+            <div class="fin-panel-title" style="margin:18px 0 8px">Not personal spend</div>
             <div class="fin-row"><span class="fin-row-key">CC BILL PAYMENTS</span><span class="fin-row-val" id="finCcBills">—</span></div>
             <div class="fin-row"><span class="fin-row-key">FAMILY</span><span class="fin-row-val" id="finFamily">—</span></div>
-            <div class="fin-setup-msg" style="font-size:10px;margin-top:6px">card bills settle card rows already counted as spend; family transfers leave net cash flow but are not spend</div>
+            <div class="fin-row"><span class="fin-row-key">COMPANY · AVANTI</span><span class="fin-row-val" id="finCompany">—</span></div>
+            <div class="fin-setup-msg" style="font-size:10px;margin-top:6px">card bills settle card rows already counted as spend; family transfers leave net cash flow but are not spend; company money (Avanti, Hostinger) is outside personal figures</div>
             <div class="fin-panel-title" style="margin:18px 0 8px">Months · income / spend / net</div>
             <div id="finMonths"><div class="fin-empty">no months yet</div></div>
         </div>
@@ -1199,13 +1201,16 @@ function renderFinance(s, txns) {
     document.getElementById('finRefunds').textContent = fmtRupee(s.refunds_month || 0);
     document.getElementById('finCcBills').textContent = fmtRupee(tr.cc_bill_payments || 0) + (tr.cc_bill_n ? ` · ${tr.cc_bill_n}×` : '');
     document.getElementById('finFamily').textContent = fmtRupee(tr.family || 0) + (tr.family_n ? ` · ${tr.family_n}×` : '');
+    const co = s.company_month || {}, li = s.loans_in_month || {};
+    document.getElementById('finCompany').textContent = fmtRupee(co.company || 0) + (co.company_n ? ` · ${co.company_n}×` : '');
+    document.getElementById('finLoansIn').textContent = fmtRupee(li.loans_in || 0) + (li.loans_n ? ` · ${li.loans_n}×` : '');
     const mEl = document.getElementById('finMonths');
     if (s.months && s.months.length) {
         mEl.innerHTML = s.months.map(m => `
             <div class="fin-row">
                 <span class="fin-row-key">${esc(m.month)}${m.salary_seen ? '' : ' <span style="color:#b08030">no salary yet</span>'}</span>
                 <span class="fin-row-val"><span class="good">+${fmtRupee(m.income)}</span> · <span class="bad">−${fmtRupee(m.spend)}</span>
-                    ${m.family ? ` · fam −${fmtRupee(m.family)}` : ''} · <span style="color:${m.net>=0?'#00cc44':'#cc4422'}">${m.net>=0?'+':'−'}${fmtRupee(Math.abs(m.net))}</span></span>
+                    ${m.family ? ` · fam −${fmtRupee(m.family)}` : ''}${m.company ? ` · co −${fmtRupee(m.company)}` : ''} · <span style="color:${m.net>=0?'#00cc44':'#cc4422'}">${m.net>=0?'+':'−'}${fmtRupee(Math.abs(m.net))}</span></span>
             </div>`).join('');
     }
     // Burn rate
