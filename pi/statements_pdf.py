@@ -215,15 +215,33 @@ def _savings_from_text(text: str) -> list[dict]:
         if not lm:
             continue
         d = parse_date(lm.group(1))
-        nums = _MONEY.findall(line[lm.end():])
-        if not d or len(nums) < 2:
+        rest = line[lm.end():]
+        hits = list(_MONEY.finditer(rest))
+        if not d or len(hits) < 2:
             continue
-        amt, bal = (float(x.replace(",", "")) for x in nums[-2:])
-        if prev is not None:
-            dirn = "credit" if bal > prev else "debit"
+        vals = [float(h.group(1).replace(",", "")) for h in hits]
+        if len(hits) >= 3:
+            # Real HDFC Combined Email Statement text (seen 2026-10-02 on 3 live PDFs): every transaction
+            # line ends "<withdrawal> <deposit> <closing balance>" with the unused column printed as 0.00.
+            wd, dep, bal = vals[-3:]
+            first = hits[-3]
+            if wd and not dep:
+                amt, dirn = wd, "debit"
+            elif dep and not wd:
+                amt, dirn = dep, "credit"
+            elif not wd and not dep:
+                continue
+            else:  # both filled: fall back to the balance delta
+                amt = max(wd, dep)
+                dirn = "credit" if (prev is not None and bal > prev) else "debit"
         else:
-            dirn = "credit" if _CREDIT_HINT.search(line) else "debit"
-        narr = line[lm.end():line.find(nums[-2], lm.end())].strip()
+            amt, bal = vals[-2:]
+            first = hits[-2]
+            if prev is not None:
+                dirn = "credit" if bal > prev else "debit"
+            else:
+                dirn = "credit" if _CREDIT_HINT.search(line) else "debit"
+        narr = rest[:first.start()].strip()
         rows.append({"date": d.isoformat(), "amount": amt, "direction": dirn, "narration": narr,
                      "balance": bal})
         prev = bal
@@ -232,7 +250,11 @@ def _savings_from_text(text: str) -> list[dict]:
 
 def parse_hdfc_savings(pdf_path: str) -> dict:
     tables, text = _pdf_tables_and_text(pdf_path)
-    rows = _savings_from_tables(tables) or _savings_from_text(text)
+    # Real statements: pdfplumber sees only the table headers (no ruling lines around the rows), so
+    # the text path carries the transactions; the table path may still catch a stray dated row.
+    # Take whichever found more.
+    from_tables, from_text = _savings_from_tables(tables), _savings_from_text(text)
+    rows = from_tables if len(from_tables) >= len(from_text) else from_text
     tail = _acct_tail(text, r"Account\s*(?:No|Number)")
     return {"account": f"HDFC Savings{(' ' + tail) if tail else ''}", "rows": rows}
 

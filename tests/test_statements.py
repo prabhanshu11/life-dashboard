@@ -244,6 +244,20 @@ def test_hdfc_savings_text_fallback_uses_balance():
         (450.0, "debit", 12550.0), (1000.0, "credit", 13550.0)]
 
 
+def test_hdfc_savings_text_three_columns_real_shape():
+    # Real Combined Email Statement text (3 live PDFs, 2026-10-02): "<withdrawal> <deposit> <balance>",
+    # the unused column printed as 0.00. The old "last two numbers" rule read every debit as 0.00.
+    text = ("Opening Balance 12,000.00\n"
+            "01/09/26 UPI-SHOP 0001 1,000.00 0.00 11,000.00\n"
+            "UPI-SHOP continuation line\n"
+            "02/09/26 NEFT IN 0002 0.00 2,500.00 13,500.00\n"
+            "03/09/26 CHARGES 0.00 0.00 13,500.00\n")
+    rows = statements_pdf._savings_from_text(text)
+    assert [(r["amount"], r["direction"], r["balance"]) for r in rows] == [
+        (1000.0, "debit", 11000.0), (2500.0, "credit", 13500.0)]
+    assert rows[0]["narration"] == "UPI-SHOP 0001"
+
+
 def test_hdfc_cc_table_parses(tmp_path):
     p = tmp_path / "c.pdf"
     p.write_bytes(cc_pdf())
