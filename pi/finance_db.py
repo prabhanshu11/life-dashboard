@@ -86,7 +86,7 @@ def init_db() -> None:
     if "ts_last" not in {r[1] for r in conn.execute("PRAGMA table_info(orders)")}:
         conn.execute("ALTER TABLE orders ADD COLUMN ts_last TEXT")
     have = {r[1] for r in conn.execute("PRAGMA table_info(transactions)")}
-    for col in ORDER_COLUMNS:
+    for col in ORDER_COLUMNS + EXTRA_COLUMNS:
         if col not in have:
             conn.execute(f"ALTER TABLE transactions ADD COLUMN {col} TEXT")
     conn.commit()
@@ -96,6 +96,17 @@ def init_db() -> None:
 # Added to `transactions` by init_db (lane orders-1002): the order a row pays for.
 # matched_email_id = the order / refund mail linked into a bank or card row (no extra row).
 ORDER_COLUMNS = ("order_id", "items", "order_status", "payment", "matched_email_id")
+# tag (2026-10-02): 'advance' on a rent row well above the monthly rent; 'not a transaction' on
+# an ignored mail row. Categories that leave spend: finance_parsers.EXCLUDED_FROM_SPEND.
+EXTRA_COLUMNS = ("tag",)
+
+
+def _classified(merchant, raw_snippet, direction, amount, account, category):
+    """(category, tag) to store: his priority rules win over the parser's regex category."""
+    import finance_parsers
+
+    hit = finance_parsers.classify(merchant, raw_snippet, direction, amount, account)
+    return hit if hit else (category, None)
 
 
 def add_transaction(
@@ -121,15 +132,16 @@ def add_transaction(
     """
     if balance_after is not None and account:
         _record_balance(account, balance_after, ts)
+    category, tag = _classified(merchant, raw_snippet, direction, amount, account, category)
     conn = _conn()
     try:
         cur = conn.execute(
             """INSERT INTO transactions
                (ts, amount, direction, account, merchant, category,
-                source, email_id, raw_snippet, payment)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                source, email_id, raw_snippet, payment, tag)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
             (ts, abs(amount), direction, account, merchant, category,
-             source, email_id, raw_snippet, payment),
+             source, email_id, raw_snippet, payment, tag),
         )
         conn.commit()
         return {"status": "added", "id": cur.lastrowid}
@@ -162,11 +174,11 @@ def get_summary() -> dict:
     day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = day_start - timedelta(days=now.weekday())
 
-    def _sum(direction: str, since: datetime) -> float:
+    def _spend(since: datetime) -> float:
         r = conn.execute(
-            "SELECT COALESCE(SUM(amount),0) FROM transactions"
-            " WHERE direction=? AND ts>=?",
-            (direction, since.isoformat()),
+            f"SELECT COALESCE(SUM(amount),0) FROM transactions WHERE direction='debit' AND ts>=?"
+            f" AND {_SPEND_FILTER}",
+            (since.isoformat(),),
         ).fetchone()
         return float(r[0])
 
@@ -174,24 +186,25 @@ def get_summary() -> dict:
         "SELECT COUNT(*) FROM transactions"
     ).fetchone()[0]
 
-    spend_month = _sum("debit", month_start)
-    spend_today = _sum("debit", day_start)
-    spend_week = _sum("debit", week_start)
-    income_month = _sum("credit", month_start)
+    spend_month = _spend(month_start)
+    spend_today = _spend(day_start)
+    spend_week = _spend(week_start)
+    this = month_flows(conn, month_start, now + timedelta(seconds=1))
+    income_month = this["income"]
 
     # Burn rate: average daily debit so far this month
     days_elapsed = max(1, (now - month_start).days + 1)
     burn_rate = spend_month / days_elapsed
 
-    # Per-account breakdown (this month)
+    # Per-account breakdown (this month): spend only (settlements / transfers / junk excluded)
     by_account = [
         dict(r)
         for r in conn.execute(
-            """SELECT account,
+            f"""SELECT account,
                       COALESCE(SUM(CASE WHEN direction='debit'  THEN amount END),0) AS debit,
                       COALESCE(SUM(CASE WHEN direction='credit' THEN amount END),0) AS credit,
                       COUNT(*) AS n
-               FROM transactions WHERE ts>=?
+               FROM transactions WHERE ts>=? AND {_SPEND_FILTER}
                GROUP BY account ORDER BY debit DESC""",
             (month_start.isoformat(),),
         ).fetchall()
@@ -201,15 +214,22 @@ def get_summary() -> dict:
     by_category = [
         dict(r)
         for r in conn.execute(
-            """SELECT COALESCE(category,'uncategorised') AS category,
+            f"""SELECT COALESCE(category,'uncategorised') AS category,
                       SUM(amount) AS total, COUNT(*) AS n
-               FROM transactions WHERE direction='debit' AND ts>=?
+               FROM transactions WHERE direction='debit' AND ts>=? AND {_SPEND_FILTER}
                GROUP BY category ORDER BY total DESC""",
             (month_start.isoformat(),),
         ).fetchall()
     ]
 
     accounts = [dict(r) for r in conn.execute("SELECT * FROM accounts").fetchall()]
+    months = []
+    m_start = month_start
+    for _ in range(4):
+        m_end = m_start.replace(day=28) + timedelta(days=4)
+        m_end = m_end.replace(day=1)
+        months.append({"month": m_start.strftime("%Y-%m"), **month_flows(conn, m_start, m_end)})
+        m_start = (m_start - timedelta(days=1)).replace(day=1)
     conn.close()
     return {
         **get_wall(now),
@@ -218,7 +238,13 @@ def get_summary() -> dict:
         "spend_week": round(spend_week, 2),
         "spend_month": round(spend_month, 2),
         "income_month": round(income_month, 2),
-        "net_month": round(income_month - spend_month, 2),
+        "net_month": this["net"],
+        "refunds_month": this["refunds"],
+        "other_credits_month": this["other_credits"],
+        "rent_month": {k: this[k] for k in ("rent", "rent_advance", "rent_n")},
+        "transfers_month": {k: this[k] for k in ("cc_bill_payments", "cc_bill_n", "family", "family_n")},
+        "ignored_month": this["ignored"],
+        "months": months,
         "burn_rate_daily": round(burn_rate, 2),
         "burn_rate_monthly": round(burn_rate * 30, 2),
         "by_account": by_account,
@@ -226,6 +252,67 @@ def get_summary() -> dict:
         "accounts": accounts,
         "generated_at": now.isoformat(),
     }
+
+
+# His rules (2026-10-02): spend = debits minus card-bill settlements, family transfers and junk mails;
+# income = salary; refunds are their own bucket; net = income + refunds − spend − family transfers.
+# The bank→card bill payment is never spend: the card rows it settles were counted when swiped.
+_SPEND_FILTER = "COALESCE(category,'') NOT IN ('ignored','cc_bill_payment','family_transfer')"
+
+
+def month_flows(conn, since: datetime, until: datetime) -> dict:
+    """Income / spend / rent / transfers / refunds / net for one window, from his rules."""
+    def q(sql, *args):
+        return conn.execute(sql, (since.isoformat(), until.isoformat(), *args)).fetchone()
+
+    base = "FROM transactions WHERE ts>=? AND ts<?"
+    income = float(q(f"SELECT COALESCE(SUM(amount),0) {base} AND direction='credit' AND category='salary'")[0])
+    refunds = float(q(f"SELECT COALESCE(SUM(amount),0) {base} AND direction='credit'"
+                      " AND category IN ('refund','cashback')")[0])
+    other_cr = float(q(f"SELECT COALESCE(SUM(amount),0) {base} AND direction='credit'"
+                       " AND COALESCE(category,'') NOT IN ('salary','refund','cashback','ignored')")[0])
+    spend = float(q(f"SELECT COALESCE(SUM(amount),0) {base} AND direction='debit' AND {_SPEND_FILTER}")[0])
+    rent = q(f"SELECT COALESCE(SUM(amount),0), COALESCE(SUM(CASE WHEN tag='advance' THEN amount END),0),"
+             f" COUNT(*) {base} AND direction='debit' AND category='rent'")
+    cc = q(f"SELECT COALESCE(SUM(amount),0), COUNT(*) {base} AND direction='debit' AND category='cc_bill_payment'")
+    fam = q(f"SELECT COALESCE(SUM(amount),0), COUNT(*) {base} AND direction='debit' AND category='family_transfer'")
+    ign = float(q(f"SELECT COALESCE(SUM(amount),0) {base} AND category='ignored'")[0])
+    return {
+        "income": round(income, 2), "refunds": round(refunds, 2), "other_credits": round(other_cr, 2),
+        "spend": round(spend, 2),
+        "rent": round(float(rent[0]), 2), "rent_advance": round(float(rent[1]), 2), "rent_n": int(rent[2]),
+        "cc_bill_payments": round(float(cc[0]), 2), "cc_bill_n": int(cc[1]),
+        "family": round(float(fam[0]), 2), "family_n": int(fam[1]),
+        "ignored": round(ign, 2),
+        "net": round(income + refunds - spend - float(fam[0]), 2),
+        "salary_seen": income > 0,
+    }
+
+
+def reclassify() -> dict:
+    """Apply finance_parsers.classify to every row (idempotent): his priority categories win;
+    rows the rules do not name keep their category and lose a stale priority category."""
+    import finance_parsers
+
+    conn = _conn()
+    changed, counts = 0, {}
+    rows = conn.execute("SELECT id, merchant, raw_snippet, direction, amount, account, category, tag"
+                        " FROM transactions").fetchall()
+    for r in rows:
+        hit = finance_parsers.classify(r["merchant"], r["raw_snippet"], r["direction"], r["amount"], r["account"])
+        if hit:
+            cat, tag = hit
+        elif r["category"] in finance_parsers.PRIORITY_CATEGORIES:
+            cat, tag = finance_parsers.infer_category(r["merchant"], r["raw_snippet"] or ""), None
+        else:
+            continue
+        counts[cat] = counts.get(cat, 0) + 1
+        if (cat, tag) != (r["category"], r["tag"]):
+            conn.execute("UPDATE transactions SET category=?, tag=? WHERE id=?", (cat, tag, r["id"]))
+            changed += 1
+    conn.commit()
+    conn.close()
+    return {"rows": len(rows), "changed": changed, "by_category": counts}
 
 
 def _record_balance(account: str, balance: float, ts: str) -> None:
@@ -277,11 +364,12 @@ def read_sync_state() -> dict | None:
 
 
 def _window(conn, since: datetime, until: datetime) -> dict:
+    # spend per his rules (no settlements / family transfers / junk); income = any real credit
     r = conn.execute(
-        """SELECT COALESCE(SUM(CASE WHEN direction='debit'  THEN amount END),0),
+        f"""SELECT COALESCE(SUM(CASE WHEN direction='debit'  THEN amount END),0),
                   COALESCE(SUM(CASE WHEN direction='credit' THEN amount END),0),
                   COUNT(*)
-           FROM transactions WHERE ts>=? AND ts<?""",
+           FROM transactions WHERE ts>=? AND ts<? AND {_SPEND_FILTER}""",
         (since.isoformat(), until.isoformat()),
     ).fetchone()
     return {
@@ -312,9 +400,9 @@ def get_wall(now: datetime | None = None) -> dict:
 
     top = [
         dict(r) for r in conn.execute(
-            """SELECT COALESCE(category,'uncategorised') AS category,
+            f"""SELECT COALESCE(category,'uncategorised') AS category,
                       ROUND(SUM(amount),2) AS total, COUNT(*) AS n
-               FROM transactions WHERE direction='debit' AND ts>=? AND ts<=?
+               FROM transactions WHERE direction='debit' AND ts>=? AND ts<=? AND {_SPEND_FILTER}
                GROUP BY 1 ORDER BY total DESC LIMIT 5""",
             (week_start.isoformat(), now.isoformat()),
         ).fetchall()
@@ -327,7 +415,7 @@ def get_wall(now: datetime | None = None) -> dict:
         r[0]: float(r[1]) for r in conn.execute(
             """SELECT substr(ts,1,10),
                       SUM(CASE WHEN direction='credit' THEN amount ELSE -amount END)
-               FROM transactions WHERE ts>=? GROUP BY 1""",
+               FROM transactions WHERE ts>=? AND COALESCE(category,'')!='ignored' GROUP BY 1""",
             (day0.isoformat(),),
         ).fetchall()
     }
@@ -806,5 +894,11 @@ def upsert_account(name: str, type_: str, balance: float) -> None:
 
 
 if __name__ == "__main__":
+    import sys
+
     init_db()
-    print(f"finance.db initialised at {DB_PATH}")
+    if "reclassify" in sys.argv[1:]:
+        # Re-apply his category rules to every row (idempotent); run after a deploy that changes them.
+        print(json.dumps(reclassify()))
+    else:
+        print(f"finance.db initialised at {DB_PATH}")

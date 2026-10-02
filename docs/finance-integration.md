@@ -202,6 +202,25 @@ cash · transfer · uncategorised` (groceries is tried before food so "Swiggy In
 card reversals are `refund`). Tune rules as needed — the data shape is
 stable, only the regexes change.
 
+### His rules (2026-10-02, lane statements-continue-1002) — `finance_parsers.classify()`
+His words: salary ~1.4 L in must be shown; Swiggy/Amazon go through the cards and the card bill is paid
+from the bank — "they should not be double counted"; rent to Rinku 12 k (+ a 50 k advance this month);
+~30 k sometimes to his father. Strings found in the real ledger, not guessed:
+
+| category (tag) | real string | effect |
+|---|---|---|
+| `salary` | `NEFT Cr-BOFA0CN6215…` credit, month end, ≥ 50 k (statement rows; alerts have not carried it yet) | income |
+| `cc_bill_payment` | `Mycards CC bill pay-…`, `UPI-PZ HDFC CC BILLPAY`, `pzhdfcccbillpayupi@hdfcbank`, `IB BILLPAY DR-HDFC97-…`, bare `IB BILLPAY` ≥ 5 k | transfers, never spend (the card rows were counted when swiped; the card-side "payment received" credit is already skipped by the statements poller) |
+| `rent` (`advance` when > 1.5 × 12 k) | VPA `rinku.chauhan1988.08@okhdfcbank` | spend; the advance is counted the month the money left, flagged so the month is not misread |
+| `family_transfer` | father = `to account 1049` / `XXXXXXXXXX1049-BARB0SAPRBS` (the name never appears in bank text); `RAJPOOT`/`RAJPUT`; the sister's `9860251934` | not spend; subtracted in net cash flow; shown in the transfers bucket |
+| `ignored` (`not a transaction`) | HDFC mails that parse like a debit but are not one: `Forex Conversion Markup Fee`, `Payment Unsuccessful`, `set up device` (the 08-21 ANTHROPIC debit had been counted 3×, 09-22 2×, a 50 k device mail once) | out of every figure |
+
+Spend = debits minus those three; income = salary; refunds (`refund`, `cashback`) are their own bucket;
+**net cash flow = income + refunds − spend − family transfers.** `get_summary()` adds `rent_month`,
+`transfers_month`, `refunds_month`, `months` (last 4 calendar months). The rules run at insert
+(`add_transaction`) and over the whole ledger with `uv run python -m finance_db reclassify`
+(idempotent; run after a deploy that changes a rule). The wall's week/last-week spend uses the same filter.
+
 ## Reset / debug
 
 ```bash

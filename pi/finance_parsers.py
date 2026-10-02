@@ -118,6 +118,45 @@ def infer_category(merchant: str | None, body: str = "") -> str:
     return "uncategorised"
 
 
+# ── his rules (2026-10-02): salary in, rent, family, card-bill settlements, non-transaction mails ──
+# Strings discovered in the real ledger (not guessed), see docs/finance-integration.md "Categorisation".
+RENT_MONTHLY = 12000.0                       # Rinku, monthly; anything well above it is an advance
+PRIORITY_CATEGORIES = ("ignored", "salary", "cc_bill_payment", "rent", "family_transfer")
+EXCLUDED_FROM_SPEND = ("ignored", "cc_bill_payment", "family_transfer")   # settlements / transfers / junk
+INCOME_CATEGORIES = ("salary",)
+REFUND_CATEGORIES = ("refund", "cashback")
+# HDFC mails that are NOT transactions but parse like one (same amount as the real debit alert):
+# the forex markup-fee notice, the "payment unsuccessful" notice, the mobile-banking device mail.
+_NOT_A_TXN = re.compile(r"Forex Conversion Markup Fee|Payment Unsuccessful|set up device"
+                        r"|successfully registered for the HDFC Bank App", re.I)
+_SALARY = re.compile(r"NEFT Cr-BOFA0CN6215|\bsalary\b|payroll", re.I)       # employer NEFT, month end
+_CC_BILL = re.compile(r"CC bill pay|CC BILLPAY|ccbillpay|IB BILLPAY DR-HDFC97|\bHDFC97\b", re.I)
+_CC_BILL_BARE = re.compile(r"\bIB BILLPAY\b", re.I)                          # netbanking bill pay, no biller
+_RENT = re.compile(r"rinku\.chauhan1988|\bRINKU\b", re.I)
+# father: his UPI shows only "to account 1049" (Bank of Baroda, BARB0SAPRBS); statements mask it as
+# XXXXXXXXXX1049-BARB0SAPRBS. Family surname and the sister's number cover the rest.
+_FAMILY = re.compile(r"to account 1049\b|X{4,}1049-BARB|1049-BARB0SAPRBS|\bRAJPOOT\b|\bRAJPUT\b|9860251934", re.I)
+
+
+def classify(merchant: str | None, text: str | None, direction: str, amount: float | None,
+             account: str | None = None) -> tuple[str, str | None] | None:
+    """(category, tag) for the rows his rules decide, else None (the regex table applies)."""
+    hay = f"{merchant or ''} {text or ''}"
+    amt = float(amount or 0)
+    if _NOT_A_TXN.search(hay):
+        return "ignored", "not a transaction"
+    if direction == "credit" and amt >= 50000 and _SALARY.search(hay):
+        return "salary", None
+    if direction == "debit":
+        if _CC_BILL.search(hay) or (amt >= 5000 and _CC_BILL_BARE.search(hay)):
+            return "cc_bill_payment", None
+        if _RENT.search(hay):
+            return "rent", ("advance" if amt > RENT_MONTHLY * 1.5 else None)
+        if _FAMILY.search(hay):
+            return "family_transfer", None
+    return None
+
+
 # ── merchant normalisation (shared with the orders code: finance_db.BRANDS / _BRAND_BUCKET) ──
 # First match wins, so the narrower names come first (Instamart before Swiggy, Fresh before Amazon).
 # Matched against the raw payee: card "towards X", "Paid to <vpa>", "VPA x@y", "Info: UPI/...".

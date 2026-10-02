@@ -654,13 +654,21 @@ body { display: flex; flex-direction: column; font-family: 'Space Grotesk', syst
         <div class="fin-panel">
             <div class="fin-panel-title">This Month · Net Flow</div>
             <div class="fin-big-num" id="finNet">₹ —</div>
-            <div class="fin-big-sub">income − spend</div>
+            <div class="fin-big-sub" id="finNetSub">income + refunds − spend − family</div>
             <div style="margin-top:16px">
-                <div class="fin-row"><span class="fin-row-key">INCOME</span><span class="fin-row-val good" id="finIncome">—</span></div>
+                <div class="fin-row"><span class="fin-row-key">INCOME (SALARY)</span><span class="fin-row-val good" id="finIncome">—</span></div>
                 <div class="fin-row"><span class="fin-row-key">SPEND</span><span class="fin-row-val bad" id="finSpend">—</span></div>
+                <div class="fin-row"><span class="fin-row-key">RENT <span id="finRentTag" style="color:#b08030"></span></span><span class="fin-row-val" id="finRent">—</span></div>
+                <div class="fin-row"><span class="fin-row-key">REFUNDS</span><span class="fin-row-val good" id="finRefunds">—</span></div>
                 <div class="fin-row"><span class="fin-row-key">TODAY</span><span class="fin-row-val" id="finToday">—</span></div>
                 <div class="fin-row"><span class="fin-row-key">THIS WEEK</span><span class="fin-row-val" id="finWeek">—</span></div>
             </div>
+            <div class="fin-panel-title" style="margin:18px 0 8px">Transfers · not spend</div>
+            <div class="fin-row"><span class="fin-row-key">CC BILL PAYMENTS</span><span class="fin-row-val" id="finCcBills">—</span></div>
+            <div class="fin-row"><span class="fin-row-key">FAMILY</span><span class="fin-row-val" id="finFamily">—</span></div>
+            <div class="fin-setup-msg" style="font-size:10px;margin-top:6px">card bills settle card rows already counted as spend; family transfers leave net cash flow but are not spend</div>
+            <div class="fin-panel-title" style="margin:18px 0 8px">Months · income / spend / net</div>
+            <div id="finMonths"><div class="fin-empty">no months yet</div></div>
         </div>
         <div class="fin-panel">
             <div class="fin-panel-title">Burn Rate</div>
@@ -1184,6 +1192,22 @@ function renderFinance(s, txns) {
     document.getElementById('finSpend').textContent = fmtRupee(s.spend_month);
     document.getElementById('finToday').textContent = fmtRupee(s.spend_today);
     document.getElementById('finWeek').textContent = fmtRupee(s.spend_week);
+    // His rules (2026-10-02): rent (advance flagged), refunds, transfers that are not spend, months
+    const rent = s.rent_month || {}, tr = s.transfers_month || {};
+    document.getElementById('finRent').textContent = fmtRupee(rent.rent || 0);
+    document.getElementById('finRentTag').textContent = rent.rent_advance ? `incl. ${fmtRupee(rent.rent_advance)} advance` : '';
+    document.getElementById('finRefunds').textContent = fmtRupee(s.refunds_month || 0);
+    document.getElementById('finCcBills').textContent = fmtRupee(tr.cc_bill_payments || 0) + (tr.cc_bill_n ? ` · ${tr.cc_bill_n}×` : '');
+    document.getElementById('finFamily').textContent = fmtRupee(tr.family || 0) + (tr.family_n ? ` · ${tr.family_n}×` : '');
+    const mEl = document.getElementById('finMonths');
+    if (s.months && s.months.length) {
+        mEl.innerHTML = s.months.map(m => `
+            <div class="fin-row">
+                <span class="fin-row-key">${esc(m.month)}${m.salary_seen ? '' : ' <span style="color:#b08030">no salary yet</span>'}</span>
+                <span class="fin-row-val"><span class="good">+${fmtRupee(m.income)}</span> · <span class="bad">−${fmtRupee(m.spend)}</span>
+                    ${m.family ? ` · fam −${fmtRupee(m.family)}` : ''} · <span style="color:${m.net>=0?'#00cc44':'#cc4422'}">${m.net>=0?'+':'−'}${fmtRupee(Math.abs(m.net))}</span></span>
+            </div>`).join('');
+    }
     // Burn rate
     document.getElementById('finBurnMo').innerHTML =
         fmtRupee(s.burn_rate_monthly) + '<span style="font-size:14px;color:#b08030">/mo</span>';
