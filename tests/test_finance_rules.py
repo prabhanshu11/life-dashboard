@@ -39,8 +39,15 @@ def test_classify_real_strings():
              "debit", 50000)[0] == "ignored"
     # ordinary rows are left to the regex table; a credit with his name is not a family transfer
     assert c("Swiggy", "UPI txn", "debit", 450) is None
+    # his review 10-02: a credit in his own name is his own money (IOB -> HDFC), not a loan back
     assert c("PRABHANSHU RAJPOOT", "Rs.8000.00 has been successfully credited to your HDFC Bank A/c",
-             "credit", 8000) == ("loan_repayment", "unconfirmed")
+             "credit", 8000) == ("self_transfer", None)
+    assert c(None, "statement hdfc_savings: UPI-PRABHANSHU", "credit", 99) == ("self_transfer", None)
+    assert c("MAYANK CHAURASIA", "Rs.2000.00 has been successfully credited to your HDFC Bank A/c",
+             "credit", 2000) == ("loan_repayment", "unconfirmed")
+    assert c(None, "statement hdfc_savings: UPI-BADAL JOSHI", "credit", 2189) == ("loan_repayment", "unconfirmed")
+    assert c("APPLE MEDIA SERVICES", "Rs.195.00 has been successfully credited", "credit", 195) == ("refund", None)
+    assert c(None, "statement hdfc_savings: Interest paid till 30-JUN-2026", "credit", 211) == ("interest", None)
     # his review 10-02: Harish Kumar = old-house rent; Avanti (IOB) + Hostinger = the company; OTP mails junk
     assert c("harishkumar0607-2@okaxis", "UPI txn", "debit", 12017) == ("rent", None)
     assert c(None, "statement hdfc_savings: UPI-HARISH KUMAR-harishkumar0607-2@", "debit", 12750)[0] == "rent"
@@ -77,8 +84,11 @@ def test_summary_buckets_and_net_cash_flow():
     _add(1, 15000, "debit", None, "Your payment for Hostinger Pte Ltd is registered", source="hdfc_cc", account="HDFC CC 0629")
     _add(1, 2000, "credit", "MAYANK CHAURASIA", "Rs.2000.00 has been successfully credited to your HDFC Bank A/c")
     s = finance_db.get_summary()
+    _add(1, 8000, "credit", "PRABHANSHU RAJPOOT", "Rs.8000.00 has been successfully credited to your HDFC Bank A/c")
+    s = finance_db.get_summary()
     assert s["company_month"] == {"company": 15000, "company_n": 1}
     assert s["loans_in_month"] == {"loans_in": 2000, "loans_n": 1}
+    assert s["self_transfers_month"] == {"self_transfers": 8000, "self_n": 1}
     # spend counts the card rows ONCE; the bill payment, the family transfer and the junk mail are out
     assert s["spend_month"] == pytest.approx(2000 + 3000 + 12000 + 50000 + 22602.33)
     assert s["income_month"] == 161379

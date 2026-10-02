@@ -122,10 +122,10 @@ def infer_category(merchant: str | None, body: str = "") -> str:
 # Strings discovered in the real ledger (not guessed), see docs/finance-integration.md "Categorisation".
 RENT_MONTHLY = 12000.0                       # Rinku, monthly; anything well above it is an advance
 PRIORITY_CATEGORIES = ("ignored", "salary", "cc_bill_payment", "rent", "family_transfer", "company",
-                       "refund", "cashback", "loan_repayment")
+                       "refund", "cashback", "loan_repayment", "self_transfer", "interest")
 # settlements / transfers / junk / the company's money: never personal spend
-EXCLUDED_FROM_SPEND = ("ignored", "cc_bill_payment", "family_transfer", "company")
-INCOME_CATEGORIES = ("salary",)
+EXCLUDED_FROM_SPEND = ("ignored", "cc_bill_payment", "family_transfer", "company", "self_transfer")
+INCOME_CATEGORIES = ("salary", "interest")
 REFUND_CATEGORIES = ("refund", "cashback")
 # HDFC mails that are NOT transactions but parse like one (same amount as the real debit alert):
 # the forex markup-fee notice, the "payment unsuccessful" notice, the device mail, OTP mails.
@@ -143,7 +143,13 @@ _FAMILY = re.compile(r"to account 1049\b|X{4,}1049-BARB|1049-BARB0SAPRBS|\bRAJPO
 # 2026-10-02 on CC 0629: "Your payment for Hostinger Pte Ltd is registered").
 _COMPANY = re.compile(r"IOBA0002903|\bAVANTI\b|hostinger", re.I)
 # card-side credits that are not money in: merchant reversals, order refunds, SmartBuy bonus
-_REFUND = re.compile(r"\brefund|reversal|SmartBuy_Bonus|cashback", re.I)
+_REFUND = re.compile(r"\brefund|reversal|SmartBuy_Bonus|cashback|APPLE MEDIA", re.I)
+# his own money between his accounts (his review 10-02: the 8,000 of 09-22 came from his own IOB account):
+# a credit in his own name, or from the IOB branch account. Outside income, spend and net.
+_SELF = re.compile(r"PRABHANSHU RAJPOOT|PRABHANSHU RAJPUT|UPI-PRABHANSHU\b|IOBA0002903", re.I)
+_INTEREST = re.compile(r"Interest paid", re.I)
+# a person paying into savings by UPI, as a statement row (no alert text): same tentative bucket
+_STMT_PERSON_UPI = re.compile(r"statement hdfc_savings: UPI-[A-Z][A-Z .]+", re.I)
 # tentative (his review 10-02: "must be some loan I gave to my friends"): a person's UPI/NEFT credit
 # into savings that is neither salary nor a refund. Shown apart from salary, outside net, until confirmed.
 _PERSON_CREDIT = re.compile(r"successfully credited to your HDFC Bank|has been credited", re.I)
@@ -164,7 +170,11 @@ def classify(merchant: str | None, text: str | None, direction: str, amount: flo
             return "cashback", None
         if _REFUND.search(hay) or acct.startswith("HDFC CC"):
             return "refund", None           # a card credit that is not a bill payment is a reversal
-        if _PERSON_CREDIT.search(hay):
+        if _SELF.search(hay):
+            return "self_transfer", None
+        if _INTEREST.search(hay):
+            return "interest", None
+        if _PERSON_CREDIT.search(hay) or _STMT_PERSON_UPI.search(hay):
             return "loan_repayment", "unconfirmed"
         return None
     if _CC_BILL.search(hay) or (amt >= 5000 and _CC_BILL_BARE.search(hay)):

@@ -668,6 +668,7 @@ body { display: flex; flex-direction: column; font-family: 'Space Grotesk', syst
             <div class="fin-row"><span class="fin-row-key">CC BILL PAYMENTS</span><span class="fin-row-val" id="finCcBills">—</span></div>
             <div class="fin-row"><span class="fin-row-key">FAMILY</span><span class="fin-row-val" id="finFamily">—</span></div>
             <div class="fin-row"><span class="fin-row-key">COMPANY · AVANTI</span><span class="fin-row-val" id="finCompany">—</span></div>
+            <div class="fin-row"><span class="fin-row-key">SELF TRANSFERS</span><span class="fin-row-val" id="finSelf">—</span></div>
             <div class="fin-setup-msg" style="font-size:10px;margin-top:6px">card bills settle card rows already counted as spend; family transfers leave net cash flow but are not spend; company money (Avanti, Hostinger) is outside personal figures</div>
             <div class="fin-panel-title" style="margin:18px 0 8px">Months · income / spend / net</div>
             <div id="finMonths"><div class="fin-empty">no months yet</div></div>
@@ -1204,6 +1205,8 @@ function renderFinance(s, txns) {
     const co = s.company_month || {}, li = s.loans_in_month || {};
     document.getElementById('finCompany').textContent = fmtRupee(co.company || 0) + (co.company_n ? ` · ${co.company_n}×` : '');
     document.getElementById('finLoansIn').textContent = fmtRupee(li.loans_in || 0) + (li.loans_n ? ` · ${li.loans_n}×` : '');
+    const st = s.self_transfers_month || {};
+    document.getElementById('finSelf').textContent = fmtRupee(st.self_transfers || 0) + (st.self_n ? ` · ${st.self_n}×` : '');
     const mEl = document.getElementById('finMonths');
     if (s.months && s.months.length) {
         mEl.innerHTML = s.months.map(m => `

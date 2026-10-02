@@ -217,9 +217,11 @@ from the bank — "they should not be double counted"; rent to Rinku 12 k (+ a 5
 | `rent` also | `harishkumar0607` / `HARISH KUMAR` = the old house (Jun–Aug) | rent across the move |
 | `refund` / `cashback` | card-side credits: `refund`, `reversal`, order refund mails, `SmartBuy_Bonus` (any credit on an HDFC CC account that is not a bill payment) | refunds bucket |
 | `loan_repayment` (`unconfirmed`) | a person's UPI/NEFT credit into savings ("successfully credited to your HDFC Bank A/c") that is not salary — his guess: friends repaying loans | shown apart from salary, outside net, pending his confirmation |
+| `self_transfer` | a credit in his own name (`PRABHANSHU RAJPOOT`, `UPI-PRABHANSHU`) or from his IOB branch account `IOBA0002903` — his own money moving between his accounts (confirmed 10-02 for the 8,000 of 09-22) | outside income, spend and net |
+| `interest` | `Interest paid till …` on the savings statement | income (with salary) |
 | `ignored` (`not a transaction`) | HDFC mails that parse like a debit but are not one: `Forex Conversion Markup Fee`, `Payment Unsuccessful`, `set up device` (the 08-21 ANTHROPIC debit had been counted 3×, 09-22 2×, a 50 k device mail once) | out of every figure |
 
-Spend = debits minus ignored / card bills / family / company; income = salary; refunds (`refund`, `cashback`) are their own bucket;
+Spend = debits minus ignored / card bills / family / company; income = salary + bank interest; refunds (`refund`, `cashback`) are their own bucket;
 **net cash flow = income + refunds − spend − family transfers.** `get_summary()` adds `rent_month`,
 `transfers_month`, `refunds_month`, `months` (last 4 calendar months). The rules run at insert
 (`add_transaction`) and over the whole ledger with `uv run python -m finance_db reclassify`
